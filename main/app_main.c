@@ -96,21 +96,15 @@ static void fall_test_btn_task(void *arg)
             // simple debounce
             vTaskDelay(pdMS_TO_TICKS(80));
             if (gpio_get_level(FALL_TEST_BTN_GPIO) == 0) {
-                ESP_LOGI(TAG, "Button press confirmed, sending FALL message");
-                char line[96];
-#ifdef CONFIG_COPROC_MSG_TEMPLATE
-                snprintf(line, sizeof(line), CONFIG_COPROC_MSG_TEMPLATE, 1, 0, 999);
-#else
-                snprintf(line, sizeof(line), "FALL persons=%d age_ms=%d seq=%d", 1, 0, 999);
-#endif
-                ESP_LOGI(TAG, "Sending: %s", line);
-                // Try UART first, fallback to SDIO
-                esp_err_t result = coproc_uart_send_line(line);
-                if (result != ESP_OK) {
-                    ESP_LOGW(TAG, "UART send failed, trying SDIO");
-                    result = coproc_sdio_send_line(line);
-                }
-                ESP_LOGI(TAG, "Send result: %s", esp_err_to_name(result));
+            ESP_LOGI(TAG, "Button press confirmed, enviando alerta via notifier");
+            int persons = 0, age_ms = 0, seq = 0;
+            pose_overlay_get_stats(&persons, &age_ms, &seq);
+            esp_err_t result = fall_notifier_send_event("Botão P1 acionado!", persons, age_ms, seq, true);
+            if (result == ESP_OK) {
+                ESP_LOGI(TAG, "Alerta manual enviado com sucesso");
+            } else {
+                ESP_LOGW(TAG, "Falha ao enviar alerta manual (%s)", esp_err_to_name(result));
+            }
 
                 // wait release
                 while (gpio_get_level(FALL_TEST_BTN_GPIO) == 0) {
