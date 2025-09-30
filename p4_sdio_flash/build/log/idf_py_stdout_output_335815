@@ -1,179 +1,0 @@
-Command: /home/alvaro/.espressif/python_env/idf5.5_py3.12_env/bin/python /home/alvaro/Downloads/esp-idf/tools/idf_monitor.py -p /dev/ttyACM0 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 1 --decode-panic backtrace /home/alvaro/Downloads/esp-p4-pose/p4_sdio_flash/build/p4_sdio_flash.elf /home/alvaro/Downloads/esp-p4-pose/p4_sdio_flash/build/bootloader/bootloader.elf -m '/home/alvaro/.espressif/python_env/idf5.5_py3.12_env/bin/python' '/home/alvaro/Downloads/esp-idf/tools/idf.py' '-p' '/dev/ttyACM0'
-ESP-ROM:esp32p4-eco2-20240710
-Build:Jul 10 2024
-rst:0x17 (CHIP_USB_UART_RESET),boot:0x30d (SPI_FAST_FLASH_BOOT)
-Core0 Saved PC:0x4fc04252
-Core1 Saved PC:0x4fc058e0
-SPI mode:DIO, clock div:1
-load:0x4ff33ce0,len:0x164c
-load:0x4ff29ed0,len:0xdfc
-load:0x4ff2cbd0,len:0x336c
-entry 0x4ff29eda
-[0;32mI (28) boot: ESP-IDF v5.5.1-144-g4b2b5d7baf 2nd stage bootloader[0m
-[0;32mI (29) boot: compile time Sep 30 2025 09:51:47[0m
-[0;32mI (29) boot: Multicore bootloader[0m
-[0;32mI (31) boot: chip revision: v1.3[0m
-[0;32mI (32) boot: efuse block revision: v0.3[0m
-[0;32mI (36) boot.esp32p4: SPI Speed      : 80MHz[0m
-[0;32mI (40) boot.esp32p4: SPI Mode       : DIO[0m
-[0;32mI (43) boot.esp32p4: SPI Flash Size : 4MB[0m
-[0;32mI (47) boot: Enabling RNG early entropy source...[0m
-[0;32mI (52) boot: Partition Table:[0m
-[0;32mI (54) boot: ## Label            Usage          Type ST Offset   Length[0m
-[0;32mI (61) boot:  0 nvs              WiFi data        01 02 00009000 00005000[0m
-[0;32mI (67) boot:  1 factory          factory app      00 00 00010000 00300000[0m
-[0;32mI (74) boot: End of partition table[0m
-[0;32mI (77) esp_image: segment 0: paddr=00010020 vaddr=40030020 size=141924h (1317156) map[0m
-[0;32mI (269) esp_image: segment 1: paddr=0015194c vaddr=30100000 size=00044h (    68) load[0m
-[0;32mI (271) esp_image: segment 2: paddr=00151998 vaddr=4ff00000 size=0e680h ( 59008) load[0m
-[0;32mI (283) esp_image: segment 3: paddr=00160020 vaddr=40000020 size=232ach (144044) map[0m
-[0;32mI (305) esp_image: segment 4: paddr=001832d4 vaddr=4ff0e680 size=022d0h (  8912) load[0m
-[0;32mI (308) esp_image: segment 5: paddr=001855ac vaddr=4ff10980 size=0241ch (  9244) load[0m
-[0;32mI (315) boot: Loaded app from partition at offset 0x10000[0m
-[0;32mI (316) boot: Disabling RNG early entropy source...[0m
-[0;32mI (332) cpu_start: Multicore app[0m
-[0;32mI (343) cpu_start: Pro cpu start user code[0m
-[0;32mI (343) cpu_start: cpu freq: 360000000 Hz[0m
-[0;32mI (344) app_init: Application information:[0m
-[0;32mI (344) app_init: Project name:     p4_sdio_flash[0m
-[0;32mI (348) app_init: App version:      dbc32bf-dirty[0m
-[0;32mI (352) app_init: Compile time:     Sep 30 2025 09:51:45[0m
-[0;32mI (357) app_init: ELF file SHA256:  d42e2c205...[0m
-[0;32mI (361) app_init: ESP-IDF:          v5.5.1-144-g4b2b5d7baf[0m
-[0;32mI (367) efuse_init: Min chip rev:     v0.1[0m
-[0;32mI (370) efuse_init: Max chip rev:     v1.99 [0m
-[0;32mI (374) efuse_init: Chip rev:         v1.3[0m
-[0;32mI (378) heap_init: Initializing. RAM available for dynamic allocation:[0m
-[0;32mI (385) heap_init: At 4FF14D40 len 00026280 (152 KiB): RAM[0m
-[0;32mI (390) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
-[0;32mI (395) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM[0m
-[0;32mI (400) heap_init: At 50108080 len 00007F80 (31 KiB): RTCRAM[0m
-[0;32mI (405) heap_init: At 30100044 len 00001FBC (7 KiB): TCM[0m
-[0;32mI (411) spi_flash: detected chip: generic[0m
-[0;32mI (414) spi_flash: flash io: dio[0m
-[0;33mW (417) spi_flash: Detected size(16384k) larger than the size in the binary image header(4096k). Using the size in the binary image header.[0m
-[0;32mI (430) main_task: Started on CPU0[0m
-[0;32mI (440) main_task: Calling app_main()[0m
-Connected to target
-[0;32mI (1250) p4_sdio_flash: Erasing entire flash (this may take a while)...[0m
-DEBUG: Error: FAILED_SPI_OP
-[0;33mW (1250) p4_sdio_flash: Flash erase failed: 9, continuing anyway[0m
-[0;32mI (1250) p4_sdio_flash: Loading bootloader...[0m
-Erasing flash (this may take a while)...
-Start programming
-Progress: 4 %Progress: 9 %Progress: 13 %Progress: 18 %Progress: 22 %Progress: 27 %Progress: 31 %Progress: 36 %Progress: 40 %Progress: 45 %Progress: 50 %Progress: 54 %Progress: 59 %Progress: 63 %Progress: 68 %Progress: 72 %Progress: 77 %Progress: 81 %Progress: 86 %Progress: 91 %Progress: 95 %Progress: 100 %
-Finished programming
-[0;32mI (1460) p4_sdio_flash: Loading partition table...[0m
-Erasing flash (this may take a while)...
-Start programming
-Progress: 33 %Progress: 66 %Progress: 100 %
-Finished programming
-[0;32mI (1510) p4_sdio_flash: Loading app...[0m
-Erasing flash (this may take a while)...
-Start programming
-Progress: 0 %Progress: 0 %Progress: 0 %Progress: 0 %Progress: 0 %Progress: 0 %Progress: 0 %Progress: 0 %Progress: 0 %Progress: 0 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 100 %
-Finished programming
-[0;32mI (7240) p4_sdio_flash: Done! Resetting target...[0m
-[0;32mI (7360) p4_sdio_flash: Ensuring C6 boots from flash (not download mode)...[0m
-[0;32mI (8060) p4_sdio_flash: ***** Target (C6) logs *****[0m
-ٕ�RX task started
-[0;32mI (483) sdio_slave: SDIO slave RX task started[0m
-[0;32mI (483) c6_msg: === STARTING WIFI ===[0m
-[0;32mI (493) pp: pp rom version: 5b8dcfa[0m
-[0;32mI (493) net80211: net80211 rom version: 5b8dcfa[0m
-[0;32mI (503) wifi:wifi driver task: 4082fc9c, prio:23, stack:6656, core=0[0m
-[0;32mI (513) wifi:wifi firmware version: df85326[0m
-[0;32mI (513) wifi:wifi certification version: v7.0[0m
-[0;32mI (513) wifi:config NVS flash: enabled[0m
-[0;32mI (513) wifi:config nano formatting: disabled[0m
-[0;32mI (523) wifi:mac_version:HAL_MAC_ESP32AX_761,ut_version:N, band mode:0x1[0m
-[0;32mI (523) wifi:Init data frame dynamic rx buffer num: 32[0m
-[0;32mI (533) wifi:Init static rx mgmt buffer num: 5[0m
-[0;32mI (533) wifi:Init management short buffer num: 32[0m
-[0;32mI (543) wifi:Init dynamic tx buffer num: 32[0m
-[0;32mI (543) wifi:Init static tx FG buffer num: 2[0m
-[0;32mI (543) wifi:Init static rx buffer size: 1700 (rxctrl:92, csi:512)[0m
-[0;32mI (553) wifi:Init static rx buffer num: 10[0m
-[0;32mI (553) wifi:Init dynamic rx buffer num: 32[0m
-[0;32mI (563) wifi_init: rx ba win: 6[0m
-[0;32mI (563) wifi_init: accept mbox: 6[0m
-[0;32mI (563) wifi_init: tcpip mbox: 32[0m
-[0;32mI (573) wifi_init: udp mbox: 6[0m
-[0;32mI (573) wifi_init: tcp mbox: 6[0m
-[0;32mI (573) wifi_init: tcp tx win: 5760[0m
-[0;32mI (573) wifi_init: tcp rx win: 5760[0m
-[0;32mI (583) wifi_init: tcp mss: 1440[0m
-[0;32mI (583) wifi_init: WiFi IRAM OP enabled[0m
-[0;32mI (583) wifi_init: WiFi RX IRAM OP enabled[0m
-[0;32mI (593) wifi_init: WiFi SLP IRAM OP enabled[0m
-[0;32mI (593) phy_init: phy_version 341,a6c8fe6,Jul 30 2025,18:34:11[0m
-[0;33mW (683) wifi:ACK_TAB0   :0x   90a0b, QAM16:0x9 (24Mbps), QPSK:0xa (12Mbps), BPSK:0xb (6Mbps)[0m
-[0;33mW (683) wifi:CTS_TAB0   :0x   90a0b, QAM16:0x9 (24Mbps), QPSK:0xa (12Mbps), BPSK:0xb (6Mbps)[0m
-[0;33mW (693) wifi:(agc)0x600a7128:0xd2119a04, min.avgNF:0xce->0xd2(dB), RCalCount:0x119, min.RRssi:0xa04(-95.75)[0m
-[0;32mI (703) wifi:11ax coex: WDEVAX_PTI0(0x55777555), WDEVAX_PTI1(0x00003377).[0m
-
-[0;32mI (713) wifi:mode : sta (fc:01:2c:e1:1b:6c)[0m
-[0;32mI (713) wifi:enable tsf[0m
-[0;32mI (713) c6_msg: Connecting to 'Alvaro'[0m
-[0;32mI (723) wifi:(he)max.RxAMPDULenExponentExtension:2, max.RxAMPDUpre-EOFpaddingBytes:4194303(0x3fffff)[0m
-[0;32mI (723) wifi:(mac)omc_ul_mu_data_disable_rx:1[0m
-[0;32mI (733) wifi:(phy)ppe_thresholds_present:1, nominal_packet_padding:3[0m
-[0;32mI (733) wifi:(phy)dcm tx(constellation:0, nss:0), dcm rx(constellation:0, nss:0)[0m
-[0;32mI (743) wifi:(phy)rx_mcs_map:0xffea, tx_mcs_map:0xffea, stbc_tx:0, bfmer(su:1, mu:0), ldpc:1, max_rate:172[0m
-[0;32mI (753) wifi:(phy)nsts:3, ru_index_bitmap:0x3(242:1, 484:1, 996:0, 2*996:0)[0m
-[0;32mI (763) wifi:(phy)threshold_bits:36, nsts_num:3, ru_num:2, he_cap->len:28, ppe_threshold_len:6(6,11,4)[0m
-[0;32mI (773) wifi:(ppe)RU242, NSTS0, PPE16:0, PPE8:7, nominal_packet_padding:2[0m
-[0;32mI (773) wifi:(opr)len:8, TWT Required:0, VHT Opr Info Present:0, 6GHz Opr Info Present:0, Co-Hosted BSS:1(max_indicator:4), Basic MCS and NSS:0xfffc[0m
-[0;32mI (793) wifi:(opr)len:8, Default PE Duration:4, TXOP RTS Threshold:0(0 us), ER-SU-Disable:1[0m
-[0;32mI (793) wifi:(opr)len:8, BSS Color:59, disabled:0, Partial BSS Color:0[0m
-[0;32mI (803) wifi:new:<6,0>, old:<1,0>, ap:<255,255>, sta:<6,0>, prof:1, snd_ch_cfg:0x0[0m
-[0;32mI (813) wifi:(connect)dot11_authmode:0x3, pairwise_cipher:0x3, group_cipher:0x3[0m
-[0;32mI (813) wifi:state: init -> auth (0xb0)[0m
-[0;32mI (823) wifi:state: auth -> assoc (0x0)[0m
-[0;32mI (833) wifi:(assoc)RESP, Extended Capabilities length:10, operating_mode_notification:0[0m
-[0;32mI (833) wifi:(assoc)RESP, Extended Capabilities, MBSSID:0, TWT Responder:0, OBSS Narrow Bandwidth RU In OFDMA Tolerance:0[0m
-[0;32mI (843) wifi:Extended Capabilities length:10, operating_mode_notification:1[0m
-[0;32mI (853) wifi:(he)max.RxAMPDULenExponentExtension:2, max.RxAMPDUpre-EOFpaddingBytes:4194303(0x3fffff)[0m
-[0;32mI (863) wifi:(mac)omc_ul_mu_data_disable_rx:1[0m
-[0;32mI (863) wifi:(phy)ppe_thresholds_present:1, nominal_packet_padding:3[0m
-[0;32mI (873) wifi:(phy)dcm tx(constellation:0, nss:0), dcm rx(constellation:0, nss:0)[0m
-[0;32mI (873) wifi:(phy)rx_mcs_map:0xffea, tx_mcs_map:0xffea, stbc_tx:0, bfmer(su:1, mu:0), ldpc:1, max_rate:172[0m
-[0;32mI (883) wifi:(phy)nsts:3, ru_index_bitmap:0x3(242:1, 484:1, 996:0, 2*996:0)[0m
-[0;32mI (893) wifi:(phy)threshold_bits:36, nsts_num:3, ru_num:2, he_cap->len:28, ppe_threshold_len:6(6,11,4)[0m
-[0;32mI (903) wifi:(ppe)RU242, NSTS0, PPE16:0, PPE8:7, nominal_packet_padding:2[0m
-[0;32mI (903) wifi:(opr)len:8, TWT Required:0, VHT Opr Info Present:0, 6GHz Opr Info Present:0, Co-Hosted BSS:1(max_indicator:4), Basic MCS and NSS:0xfffc[0m
-[0;32mI (923) wifi:(opr)len:8, Default PE Duration:4, TXOP RTS Threshold:0(0 us), ER-SU-Disable:1[0m
-[0;32mI (933) wifi:(opr)len:8, BSS Color:59, disabled:0, Partial BSS Color:0[0m
-[0;32mI (933) wifi:state: assoc -> run (0x10)[0m
-[0;32mI (943) wifi:(he)ppe_thresholds_present:1, nominal_packet_padding(rx:3, cfg:2)[0m
-[0;32mI (943) wifi:(trc)phytype:CBW20-SGI, snr:37, maxRate:172, highestRateIdx:0[0m
-[0;33mW (953) wifi:(trc)band:2G, phymode:3, highestRateIdx:0, lowestRateIdx:11, dataSchedTableSize:14[0m
-[0;32mI (963) wifi:(trc)band:2G, rate(S-MCS7, rateIdx:0), ampdu(rate:S-MCS7, schedIdx(0, stop:8)), snr:37, ampduState:wait operational[0m
-[0;32mI (973) wifi:ifidx:0, rssi:-59, nf:-96, phytype(0x3, CBW20-SGI), phymode(0x7, 11ax), max_rate:172, he:1, vht:0, ht:1[0m
-[0;32mI (983) wifi:(ht)max.RxAMPDULenExponent:3(65535 bytes), MMSS:5(4 us)[0m
-[0;32mI (1003) wifi:(extcap)mbssid:0, enhanced_mbssid_advertise:0, complete_nontxbssid_profiles:0, twt_responder: 1[0m
-[0;32mI (1003) wifi:connected with Alvaro, aid = 16, channel 6, BW20, bssid = a4:22:49:90:e3:74[0m
-[0;32mI (1013) wifi:security: WPA2-PSK, phy:ax, rssi:-59, cipher(pairwise:0x3, group:0x3), pmf:0, [0m
-[0;32mI (1023) wifi:pm start, type: 1, twt_start:0[0m
-
-[0;32mI (1023) wifi:pm start, type:1, aid:0x10, trans-BSSID:a4:22:49:90:e3:74, BSSID[5]:0x74, mbssid(max-indicator:0, index:0), he:1[0m
-[0;32mI (1033) wifi:dp: 1, bi: 102400, li: 3, scale listen interval from 307200 us to 307200 us[0m
-[0;32mI (1043) wifi:set rx beacon pti, rx_bcn_pti: 10, bcn_timeout: 25000, mt_pti: 10, mt_time: 10000[0m
-[0;32mI (1053) wifi:[ADDBA]TX addba request, tid:0, dialogtoken:1, bufsize:32, A-MSDU:0(not supported), policy:1(IMR), ssn:0(0x0)[0m
-[0;32mI (1063) wifi:[ADDBA]TX addba request, tid:7, dialogtoken:2, bufsize:32, A-MSDU:0(not supported), policy:1(IMR), ssn:0(0x20)[0m
-[0;32mI (1073) wifi:[ADDBA]TX addba request, tid:5, dialogtoken:3, bufsize:32, A-MSDU:0(not supported), policy:1(IMR), ssn:0(0x0)[0m
-[0;32mI (1083) wifi:AP's beacon interval = 102400 us, DTIM period = 1[0m
-[0;32mI (1093) wifi:[ADDBA]RX addba response, status:0, tid:0/tb:1(0xa1), bufsize:32, batimeout:0, txa_wnd:32[0m
-[0;32mI (1093) wifi:[ADDBA]RX addba response, status:0, tid:7/tb:1(0xa1), bufsize:32, batimeout:0, txa_wnd:32[0m
-[0;32mI (1103) wifi:[ADDBA]RX addba response, status:0, tid:5/tb:1(0xa1), bufsize:32, batimeout:0, txa_wnd:32[0m
-[0;33mW (1133) wifi:<ba-add>idx:0, ifx:0, tid:0, TAHI:0x10074e3, TALO:0x904922a4, (ssn:1, win:64, cur_ssn:1), CONF:0xc0000005[0m
-[0;32mI (3193) esp_netif_handlers: sta ip: 192.168.0.246, mask: 255.255.255.0, gw: 192.168.0.1[0m
-[0;32mI (3213) c6_msg: Wi-Fi ready[0m
-[0;32mI (3213) sdio_slave: SDIO response sent: C6: Wi-Fi conectado[0m
-[0;33mW (7263) wifi:<ba-add>idx:1, ifx:0, tid:6, TAHI:0x10074e3, TALO:0x904922a4, (ssn:1, win:64, cur_ssn:1), CONF:0xc0006005[0m
-[0;32mI (7713) c6_msg: SNTP ok: 2025-09-30 12:52[0m
-[0;32mI (7713) sdio_slave: SDIO response sent: C6: SNTP OK[0m
-[0;32mI (7713) sdio_slave: SDIO response sent: C6: Sistema iniciado com SDIO+UART[0m
-[0;32mI (7713) c6_msg: === UART READER TASK STARTED ===[0m
-[0;32mI (7713) c6_msg: UART reader: waiting for messages...[0m
-[0;32mI (7723) main_task: Returned from app_main()[0m
