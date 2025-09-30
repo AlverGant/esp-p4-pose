@@ -124,7 +124,11 @@ static esp_err_t sdio_host_init(void)
             // Initialize ESSL (ESP Serial Slave Link) for high-level packet communication
             essl_sdio_config_t essl_config = {
                 .card = s_card,
-                .recv_buffer_size = 2048,  // Must match or exceed slave buffer size
+                // Host and slave must agree on the packet buffer size. We use the
+                // exact payload size handled by the C6 firmware to avoid the ESSL
+                // driver mis-counting buffers (it treats this value as the
+                // negotiated buffer length).
+                .recv_buffer_size = sizeof(sdio_message_t),
             };
 
             ret = essl_sdio_init_dev(&s_essl_handle, &essl_config);
@@ -185,7 +189,8 @@ static void coproc_sdio_rx_task(void *arg)
 
     ESP_LOGI(TAG_SDIO, "SDIO RX task started");
 
-    uint8_t *buffer = heap_caps_malloc(2048, MALLOC_CAP_DMA);
+    const size_t packet_size = sizeof(sdio_message_t);
+    uint8_t *buffer = heap_caps_malloc(packet_size, MALLOC_CAP_DMA);
     if (!buffer) {
         ESP_LOGE(TAG_SDIO, "Failed to allocate DMA buffer for SDIO RX");
         vTaskDelete(NULL);
@@ -194,9 +199,9 @@ static void coproc_sdio_rx_task(void *arg)
 
     for (;;) {
         // Try to receive packet from SDIO slave using ESSL API
-        size_t size_read = 2048;
+        size_t size_read = packet_size;
         const int wait_ms = 1000;  // 1 second timeout
-        esp_err_t ret = essl_get_packet(s_essl_handle, buffer, 2048, &size_read, wait_ms);
+        esp_err_t ret = essl_get_packet(s_essl_handle, buffer, packet_size, &size_read, wait_ms);
 
         if (ret == ESP_OK) {
             // Validate message
