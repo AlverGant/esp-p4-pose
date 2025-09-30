@@ -30,15 +30,19 @@ static essl_handle_t s_essl_handle = NULL;
 static bool s_sdio_inited = false;
 static TaskHandle_t s_rx_task = NULL;
 
-// SDIO message structure
+// SDIO message structure (align payload to 512 bytes for SDMMC transfers)
+#define SDIO_MSG_TOTAL_SIZE   512
+#define SDIO_MSG_MAGIC        0xFA112024
+#define SDIO_MSG_DATA_MAX_LEN (SDIO_MSG_TOTAL_SIZE - sizeof(uint32_t) * 3)
+
 typedef struct {
     uint32_t magic;     // 0xFA112024
-    uint32_t length;    // Message length
-    char data[256];     // Message data
+    uint32_t length;    // Message length (bytes used in data[])
+    char data[SDIO_MSG_DATA_MAX_LEN];
     uint32_t checksum;  // Simple checksum
 } __attribute__((packed)) sdio_message_t;
 
-#define SDIO_MSG_MAGIC 0xFA112024
+_Static_assert(sizeof(sdio_message_t) == SDIO_MSG_TOTAL_SIZE, "SDIO message size must stay 512 bytes");
 
 static uint32_t calculate_checksum(const sdio_message_t *msg)
 {

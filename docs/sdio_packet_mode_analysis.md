@@ -17,21 +17,23 @@ estar ativo (já que o C6 pode ser gravado via SDIO).
 * O driver ESSL expõe no `essl_sdio_config_t.recv_buffer_size` o "tamanho de
   buffer pré-negociado usado por host e slave"; a documentação deixa claro que o
   valor deve ser idêntico em ambos os lados.【F:components/esp_serial_slave_link/include/esp_serial_slave_link/essl_sdio.h†L22-L37】
-* Do lado C6 já usamos `sizeof(sdio_message_t)` tanto no `recv_buffer_size`
-  quanto na alocação dos buffers DMA.【F:c6_messenger/main/coproc_sdio_slave.c†L125-L159】
-* No P4, entretanto, o valor fixo anterior de 2048 bytes fazia o host acreditar
-  que cada mensagem ocuparia um bloco de 2 KiB. Quando o slave reportava apenas
-  268 bytes disponíveis, a contabilidade interna da ESSL ficava inconsistente e
-  a função retornava `ESP_ERR_INVALID_ARG`.
+* Ao alinhar `sizeof(sdio_message_t)` a 512 bytes (múltiplo do tamanho de bloco
+  da controladora), host e slave passam a negociar exatamente o mesmo tamanho de
+  pacote. Isso evita que o host tente contabilizar buffers maiores do que o C6
+  efetivamente disponibiliza, condição que fazia a ESSL retornar
+  `ESP_ERR_INVALID_ARG`.
 
 ### Correção implementada
 
 * O host agora negocia exatamente o mesmo tamanho de pacote do slave usando
-  `sizeof(sdio_message_t)` tanto na configuração do handle ESSL quanto na
-  alocação/uso do buffer DMA.【F:main/coproc_sdio.c†L125-L205】
+  `sizeof(sdio_message_t)` (512 bytes) tanto na configuração do handle ESSL
+  quanto na alocação/uso do buffer DMA.【F:main/coproc_sdio.c†L40-L205】
+* No C6 os buffers DMA e o `recv_buffer_size` também passaram a usar o valor de
+  512 bytes, com *static assert* garantindo paridade com o lado host.【F:c6_messenger/main/coproc_sdio_slave.c†L16-L198】
 * Essa alteração alinha o contrato de ambos os lados e impede que a ESSL rejeite
-  a leitura por divergência de tamanhos. Qualquer mensagem enviada pelo C6 volta
-  a cair no caminho `ESP_OK`, onde o checksum é validado e a string é impressa.
+  transferências por divergência de tamanho. Qualquer mensagem enviada pelo C6
+  volta a cair no caminho `ESP_OK`, onde o checksum é validado e a string é
+  impressa.
 
 ## 3. Verificações elétricas recomendadas
 

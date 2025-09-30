@@ -10,15 +10,19 @@
 
 static const char *TAG_SDIO = "sdio_slave";
 
-// SDIO message structure (same as host)
+// SDIO message structure (must match host, aligned to 512 bytes)
+#define SDIO_MSG_TOTAL_SIZE   512
+#define SDIO_MSG_MAGIC        0xFA112024
+#define SDIO_MSG_DATA_MAX_LEN (SDIO_MSG_TOTAL_SIZE - sizeof(uint32_t) * 3)
+
 typedef struct {
     uint32_t magic;     // 0xFA112024
-    uint32_t length;    // Message length
-    char data[256];     // Message data
+    uint32_t length;    // Message length (bytes used in data[])
+    char data[SDIO_MSG_DATA_MAX_LEN];
     uint32_t checksum;  // Simple checksum
 } __attribute__((packed)) sdio_message_t;
 
-#define SDIO_MSG_MAGIC 0xFA112024
+_Static_assert(sizeof(sdio_message_t) == SDIO_MSG_TOTAL_SIZE, "SDIO message size must stay 512 bytes");
 #define SDIO_SLAVE_QUEUE_SIZE 8
 
 static bool s_sdio_slave_inited = false;
@@ -126,7 +130,7 @@ esp_err_t coproc_sdio_slave_init(void)
     sdio_slave_config_t slave_config = {
         .sending_mode = SDIO_SLAVE_SEND_PACKET,  // Changed from STREAM to PACKET
         .send_queue_size = SDIO_SLAVE_QUEUE_SIZE,
-        .recv_buffer_size = sizeof(sdio_message_t),  // Single message size
+        .recv_buffer_size = sizeof(sdio_message_t),  // Single message size (512 bytes)
         .event_cb = NULL,  // No event callback for now
         .flags = 0,
     };
