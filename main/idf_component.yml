@@ -37,3 +37,15 @@ dependencies:
     path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_audio_codec"
   espressif/cmake_utilities:
     path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__cmake_utilities"
+  espressif/esp_wifi_remote:
+    version: ">=0.10,<2.0"
+    rules:
+      - if: "target in [esp32p4, esp32h2]"
+  espressif/esp_hosted:
+    version: "~2"
+    rules:
+      - if: "target in [esp32p4, esp32h2]"
+  espressif/esp-extconn:
+    version: "~0.3.0"
+    rules:
+      - if: "target in [esp32p4]"
