@@ -9,6 +9,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include <string.h>
+#include <stdlib.h>
 
 static const char *TAG_SDIO = "coproc_sdio";
 
@@ -164,10 +165,13 @@ static esp_err_t sdio_host_init(void)
         }
     }
 
-    ESP_LOGW(TAG_SDIO, "SDIO card init failed after %d retries: %s (continuing without SDIO)",
-             max_retries, esp_err_to_name(ret));
-    ESP_LOGI(TAG_SDIO, "SDIO host initialized (slave connection pending)");
-    return ESP_OK;
+    ESP_LOGE(TAG_SDIO, "SDIO card init failed after %d retries: %s", max_retries, esp_err_to_name(ret));
+    if (s_card) {
+        free(s_card);
+        s_card = NULL;
+    }
+    sdmmc_host_deinit();
+    return ret;
 }
 
 static void coproc_sdio_rx_task(void *arg)
