@@ -1,10 +1,12 @@
 #include "net_telegram.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include "sdkconfig.h"
 #include "esp_log.h"
 #include "esp_event.h"
 #include "esp_netif.h"
+#include "esp_err.h"
 #include "nvs_flash.h"
 #include "esp_http_client.h"
 #include "soc/soc_caps.h"
@@ -13,8 +15,16 @@
 #if SOC_WIFI_SUPPORTED
 #include "esp_wifi.h"
 #endif
+#if CONFIG_ESP_WIFI_REMOTE_ENABLED
+#include "esp_hosted.h"
+#include "esp_wifi_remote.h"
+#endif
 
 static const char *TAG_NET = "net";
+
+#if CONFIG_ESP_WIFI_REMOTE_ENABLED
+static esp_netif_t *s_remote_sta_netif;
+#endif
 
 // Simple Wi-Fi connection helper (STA)
 esp_err_t net_init_wifi(void)
@@ -49,6 +59,64 @@ esp_err_t net_init_wifi(void)
         }
     }
     ESP_LOGW(TAG_NET, "Wi-Fi IP not acquired yet; continuing");
+    return ESP_OK;
+#elif CONFIG_ESP_WIFI_REMOTE_ENABLED
+    ESP_LOGI(TAG_NET, "Init ESP-Hosted transport and Wi-Fi");
+
+    esp_err_t err = esp_netif_init();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        ESP_ERROR_CHECK(err);
+    }
+
+    err = esp_event_loop_create_default();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        ESP_ERROR_CHECK(err);
+    }
+
+    if (!s_remote_sta_netif) {
+        s_remote_sta_netif = esp_wifi_remote_create_default_sta();
+        if (!s_remote_sta_netif) {
+            ESP_LOGE(TAG_NET, "Failed to create remote STA netif");
+            return ESP_FAIL;
+        }
+    }
+
+    int hosted_ret = esp_hosted_init();
+    if (hosted_ret != ESP_OK) {
+        ESP_LOGE(TAG_NET, "esp_hosted_init failed: %d", hosted_ret);
+        return hosted_ret;
+    }
+
+    hosted_ret = esp_hosted_connect_to_slave();
+    if (hosted_ret != ESP_OK) {
+        ESP_LOGE(TAG_NET, "esp_hosted_connect_to_slave failed: %d", hosted_ret);
+        return hosted_ret;
+    }
+
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+    wifi_config_t wifi_cfg = (wifi_config_t) { 0 };
+    strncpy((char *)wifi_cfg.sta.ssid, CONFIG_WIFI_SSID, sizeof(wifi_cfg.sta.ssid) - 1);
+    strncpy((char *)wifi_cfg.sta.password, CONFIG_WIFI_PASSWORD, sizeof(wifi_cfg.sta.password) - 1);
+    wifi_cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg));
+    ESP_ERROR_CHECK(esp_wifi_start());
+    ESP_ERROR_CHECK(esp_wifi_connect());
+
+    ESP_LOGI(TAG_NET, "Connecting to Wi-Fi via ESP-Hosted SSID='%s'", CONFIG_WIFI_SSID);
+
+    esp_netif_ip_info_t ip;
+    for (int i = 0; i < 100; ++i) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+        if (esp_netif_get_ip_info(s_remote_sta_netif, &ip) == ESP_OK && ip.ip.addr != 0) {
+            ESP_LOGI(TAG_NET, "Got IP from remote interface");
+            return ESP_OK;
+        }
+    }
+    ESP_LOGW(TAG_NET, "Remote Wi-Fi IP not acquired yet; continuing");
     return ESP_OK;
 #else
     ESP_LOGW(TAG_NET, "Wi-Fi not supported on this SoC without companion radio");
