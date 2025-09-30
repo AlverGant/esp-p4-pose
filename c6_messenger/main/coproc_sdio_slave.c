@@ -10,8 +10,8 @@
 
 static const char *TAG_SDIO = "sdio_slave";
 
-// SDIO message structure (must match host, aligned to 512 bytes)
-#define SDIO_MSG_TOTAL_SIZE   512
+// SDIO message structure (must match host for ESSL protocol)
+#define SDIO_MSG_TOTAL_SIZE   256
 #define SDIO_MSG_MAGIC        0xFA112024
 #define SDIO_MSG_DATA_MAX_LEN (SDIO_MSG_TOTAL_SIZE - sizeof(uint32_t) * 3)
 
@@ -22,7 +22,7 @@ typedef struct {
     uint32_t checksum;  // Simple checksum
 } __attribute__((packed)) sdio_message_t;
 
-_Static_assert(sizeof(sdio_message_t) == SDIO_MSG_TOTAL_SIZE, "SDIO message size must stay 512 bytes");
+_Static_assert(sizeof(sdio_message_t) == SDIO_MSG_TOTAL_SIZE, "SDIO message size must be 256 bytes");
 #define SDIO_SLAVE_QUEUE_SIZE 8
 
 static bool s_sdio_slave_inited = false;
@@ -39,6 +39,11 @@ static uint32_t calculate_checksum(const sdio_message_t *msg)
     return sum;
 }
 
+// TX buffer pool for SDIO slave sending (need DMA-capable memory)
+#define TX_BUFFER_NUM 8
+static uint8_t *s_tx_buffers[TX_BUFFER_NUM];
+static QueueHandle_t s_tx_buffer_pool;
+
 static void sdio_slave_tx_task(void *arg)
 {
     (void)arg;
@@ -48,13 +53,33 @@ static void sdio_slave_tx_task(void *arg)
 
     for (;;) {
         if (xQueueReceive(s_tx_queue, &tx_msg, portMAX_DELAY) == pdTRUE) {
-            // Send the message - cast to uint8_t* for sdio_slave_transmit
-            esp_err_t ret = sdio_slave_transmit((uint8_t*)&tx_msg, sizeof(tx_msg));
+            // Get a buffer from the pool
+            uint8_t *tx_buf = NULL;
+            if (xQueueReceive(s_tx_buffer_pool, &tx_buf, pdMS_TO_TICKS(1000)) != pdTRUE) {
+                ESP_LOGW(TAG_SDIO, "No TX buffer available");
+                continue;
+            }
+
+            // Copy message to DMA buffer
+            memcpy(tx_buf, &tx_msg, sizeof(tx_msg));
+
+            // Send the message using PACKET mode API
+            // arg will be the buffer pointer so we can return it to pool later
+            esp_err_t ret = sdio_slave_send_queue(tx_buf, sizeof(tx_msg), tx_buf, portMAX_DELAY);
             if (ret == ESP_OK) {
                 ESP_LOGI(TAG_SDIO, "SDIO response sent: %s", tx_msg.data);
             } else {
-                ESP_LOGW(TAG_SDIO, "Failed to send SDIO response: %s", esp_err_to_name(ret));
+                ESP_LOGW(TAG_SDIO, "Failed to queue SDIO response: %s", esp_err_to_name(ret));
+                // Return buffer to pool on error
+                xQueueSend(s_tx_buffer_pool, &tx_buf, 0);
             }
+        }
+
+        // Check for finished sends and return buffers to pool
+        void *finished_arg = NULL;
+        while (sdio_slave_send_get_finished(&finished_arg, 0) == ESP_OK) {
+            uint8_t *finished_buf = (uint8_t*)finished_arg;
+            xQueueSend(s_tx_buffer_pool, &finished_buf, 0);
         }
     }
 }
@@ -62,54 +87,51 @@ static void sdio_slave_tx_task(void *arg)
 static void sdio_slave_rx_task(void *arg)
 {
     (void)arg;
-    sdio_message_t rx_msg;
-    sdio_slave_buf_handle_t handle = NULL;
-    uint8_t *recv_buf = NULL;
-    size_t length = 0;
-
     ESP_LOGI(TAG_SDIO, "SDIO slave RX task started");
 
     for (;;) {
-        // Receive from SDIO - using correct API signature
-        esp_err_t ret = sdio_slave_recv(&handle, &recv_buf, &length, portMAX_DELAY);
+        sdio_slave_buf_handle_t handle;
+        // Receive packet using PACKET mode API (non-blocking)
+        esp_err_t ret = sdio_slave_recv_packet(&handle, pdMS_TO_TICKS(1000));
 
-        if (ret == ESP_OK && recv_buf != NULL && length >= sizeof(rx_msg)) {
-            // Copy received data to message structure
-            memcpy(&rx_msg, recv_buf, sizeof(rx_msg));
+        if (ret == ESP_OK || ret == ESP_ERR_NOT_FINISHED) {
+            // Get buffer and length
+            size_t length = 0;
+            uint8_t *recv_buf = sdio_slave_recv_get_buf(handle, &length);
 
-            // Return the buffer via handle
+            if (recv_buf != NULL && length >= sizeof(sdio_message_t)) {
+                // Copy received data to message structure
+                sdio_message_t rx_msg;
+                memcpy(&rx_msg, recv_buf, sizeof(rx_msg));
+
+                // Validate message
+                if (rx_msg.magic == SDIO_MSG_MAGIC &&
+                    rx_msg.length < sizeof(rx_msg.data) &&
+                    calculate_checksum(&rx_msg) == rx_msg.checksum) {
+
+                    rx_msg.data[rx_msg.length] = '\0';  // Ensure null termination
+                    ESP_LOGI(TAG_SDIO, "SDIO message received: %s", rx_msg.data);
+
+                    // Call message handler
+                    if (s_msg_handler) {
+                        s_msg_handler(rx_msg.data);
+                    }
+
+                    // Send acknowledgment
+                    coproc_sdio_slave_send_line("C6: Message received");
+                } else {
+                    ESP_LOGW(TAG_SDIO, "Invalid SDIO message (magic=0x%08lX, len=%lu, size=%zu)",
+                            (unsigned long)rx_msg.magic, (unsigned long)rx_msg.length, length);
+                }
+            }
+
+            // Return the buffer to receive driver
             ret = sdio_slave_recv_load_buf(handle);
             if (ret != ESP_OK) {
                 ESP_LOGW(TAG_SDIO, "Failed to reload buffer: %s", esp_err_to_name(ret));
             }
-            handle = NULL;
-            recv_buf = NULL;
-
-            // Validate message
-            if (rx_msg.magic == SDIO_MSG_MAGIC &&
-                rx_msg.length < sizeof(rx_msg.data) &&
-                calculate_checksum(&rx_msg) == rx_msg.checksum) {
-
-                rx_msg.data[rx_msg.length] = '\0';  // Ensure null termination
-                ESP_LOGI(TAG_SDIO, "SDIO message received: %s", rx_msg.data);
-
-                // Call message handler
-                if (s_msg_handler) {
-                    s_msg_handler(rx_msg.data);
-                }
-
-                // Send acknowledgment
-                coproc_sdio_slave_send_line("C6: Message received");
-            } else {
-                ESP_LOGW(TAG_SDIO, "Invalid SDIO message (magic=0x%08lX, len=%lu, size=%zu)",
-                        (unsigned long)rx_msg.magic, (unsigned long)rx_msg.length, length);
-            }
         } else if (ret != ESP_ERR_TIMEOUT) {
             ESP_LOGW(TAG_SDIO, "SDIO receive failed: %s", esp_err_to_name(ret));
-            if (handle) {
-                sdio_slave_recv_load_buf(handle);
-                handle = NULL;
-            }
             vTaskDelay(pdMS_TO_TICKS(100));  // Brief delay on error
         }
     }
@@ -192,6 +214,24 @@ esp_err_t coproc_sdio_slave_init(void)
         ESP_LOGE(TAG_SDIO, "Failed to start SDIO slave: %s", esp_err_to_name(ret));
         sdio_slave_stop();
         return ret;
+    }
+
+    // Create TX buffer pool
+    s_tx_buffer_pool = xQueueCreate(TX_BUFFER_NUM, sizeof(uint8_t*));
+    if (!s_tx_buffer_pool) {
+        ESP_LOGE(TAG_SDIO, "Failed to create TX buffer pool");
+        sdio_slave_stop();
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Allocate DMA-capable TX buffers and add to pool
+    for (int i = 0; i < TX_BUFFER_NUM; i++) {
+        s_tx_buffers[i] = heap_caps_malloc(sizeof(sdio_message_t), MALLOC_CAP_DMA);
+        if (!s_tx_buffers[i]) {
+            ESP_LOGE(TAG_SDIO, "Failed to allocate TX buffer %d", i);
+            return ESP_ERR_NO_MEM;
+        }
+        xQueueSend(s_tx_buffer_pool, &s_tx_buffers[i], 0);
     }
 
     // Create TX queue

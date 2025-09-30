@@ -104,11 +104,11 @@ static void fall_test_btn_task(void *arg)
                 snprintf(line, sizeof(line), "FALL persons=%d age_ms=%d seq=%d", 1, 0, 999);
 #endif
                 ESP_LOGI(TAG, "Sending: %s", line);
-                // Try SDIO first, fallback to UART
-                esp_err_t result = coproc_sdio_send_line(line);
+                // Try UART first, fallback to SDIO
+                esp_err_t result = coproc_uart_send_line(line);
                 if (result != ESP_OK) {
-                    ESP_LOGW(TAG, "SDIO send failed, trying UART");
-                    result = coproc_uart_send_line(line);
+                    ESP_LOGW(TAG, "UART send failed, trying SDIO");
+                    result = coproc_sdio_send_line(line);
                 }
                 ESP_LOGI(TAG, "Send result: %s", esp_err_to_name(result));
 
@@ -284,15 +284,19 @@ void app_main(void)
 
     // Start co-processor SDIO communication with C6
 #if CONFIG_COPROC_UART_ENABLE
-    ESP_LOGI(TAG, "Initializing SDIO communication with C6...");
+    // Always initialize UART for fallback communication
+    ESP_LOGI(TAG, "Initializing UART communication with C6...");
+    (void)coproc_uart_init();
+    (void)coproc_uart_start_rx_log();
+
+    // Also try SDIO (but use UART as primary for now due to SDIO issues)
+    ESP_LOGI(TAG, "Attempting SDIO communication with C6...");
     esp_err_t sdio_ret = coproc_sdio_init();
     if (sdio_ret == ESP_OK) {
         (void)coproc_sdio_start_rx_log();
-        ESP_LOGI(TAG, "SDIO communication initialized successfully");
+        ESP_LOGI(TAG, "SDIO communication initialized (UART remains active)");
     } else {
-        ESP_LOGW(TAG, "SDIO init failed, falling back to UART");
-        (void)coproc_uart_init();
-        (void)coproc_uart_start_rx_log();
+        ESP_LOGW(TAG, "SDIO init failed, using UART only");
     }
 #endif
 

@@ -30,8 +30,8 @@ static essl_handle_t s_essl_handle = NULL;
 static bool s_sdio_inited = false;
 static TaskHandle_t s_rx_task = NULL;
 
-// SDIO message structure (align payload to 512 bytes for SDMMC transfers)
-#define SDIO_MSG_TOTAL_SIZE   512
+// SDIO message structure (must match slave buffer size for ESSL protocol)
+#define SDIO_MSG_TOTAL_SIZE   256
 #define SDIO_MSG_MAGIC        0xFA112024
 #define SDIO_MSG_DATA_MAX_LEN (SDIO_MSG_TOTAL_SIZE - sizeof(uint32_t) * 3)
 
@@ -42,7 +42,7 @@ typedef struct {
     uint32_t checksum;  // Simple checksum
 } __attribute__((packed)) sdio_message_t;
 
-_Static_assert(sizeof(sdio_message_t) == SDIO_MSG_TOTAL_SIZE, "SDIO message size must stay 512 bytes");
+_Static_assert(sizeof(sdio_message_t) == SDIO_MSG_TOTAL_SIZE, "SDIO message size must be 256 bytes");
 
 static uint32_t calculate_checksum(const sdio_message_t *msg)
 {
@@ -300,14 +300,15 @@ esp_err_t coproc_sdio_send_line(const char *line)
         return ESP_ERR_INVALID_ARG;
     }
 
-    // Check buffer availability first
+    // Check RX data size first to verify slave is responding
+    uint32_t rx_size = 0;
+    esp_err_t ret = essl_get_rx_data_size(s_essl_handle, &rx_size, 100);
+    ESP_LOGI(TAG_SDIO, "Slave RX data size check: ret=%s, size=%lu", esp_err_to_name(ret), (unsigned long)rx_size);
+
+    // Check buffer availability
     uint32_t tx_num = 0;
-    esp_err_t ret = essl_get_tx_buffer_num(s_essl_handle, &tx_num, 100);
-    if (ret == ESP_OK) {
-        ESP_LOGI(TAG_SDIO, "C6 has %lu TX buffers available", (unsigned long)tx_num);
-    } else {
-        ESP_LOGW(TAG_SDIO, "Failed to get TX buffer num: %s", esp_err_to_name(ret));
-    }
+    ret = essl_get_tx_buffer_num(s_essl_handle, &tx_num, 100);
+    ESP_LOGI(TAG_SDIO, "C6 TX buffer num: ret=%s, buffers=%lu", esp_err_to_name(ret), (unsigned long)tx_num);
 
     // Send via ESSL packet API (handles SDIO packet mode protocol)
     const int wait_ms = 1000;  // 1 second timeout

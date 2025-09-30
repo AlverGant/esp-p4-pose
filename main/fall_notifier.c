@@ -57,20 +57,20 @@ static void notifier_task(void *arg)
                 // Use template from Kconfig
                 snprintf(line, sizeof line, CONFIG_COPROC_MSG_TEMPLATE, persons, age_ms, seq);
 
-                // Try SDIO first, fallback to UART if SDIO fails
-                esp_err_t err = coproc_sdio_send_line(line);
+                // Try UART first (more reliable), fallback to SDIO if UART fails
+                esp_err_t err = coproc_uart_send_line(line);
                 if (err == ESP_OK) {
                     last_sent_us = now;
-                    ESP_LOGI(TAG_NOTIF, "SDIO enviado: %s", line);
+                    ESP_LOGI(TAG_NOTIF, "UART enviado: %s", line);
                 } else {
-                    // Fallback to UART
-                    ESP_LOGW(TAG_NOTIF, "SDIO falhou, usando UART");
-                    err = coproc_uart_send_line(line);
+                    // Fallback to SDIO
+                    ESP_LOGW(TAG_NOTIF, "UART falhou, tentando SDIO");
+                    err = coproc_sdio_send_line(line);
                     if (err == ESP_OK) {
                         last_sent_us = now;
-                        ESP_LOGI(TAG_NOTIF, "UART enviado: %s", line);
+                        ESP_LOGI(TAG_NOTIF, "SDIO enviado: %s", line);
                     } else {
-                        ESP_LOGW(TAG_NOTIF, "Falha ao enviar (%s)", esp_err_to_name(err));
+                        ESP_LOGW(TAG_NOTIF, "Falha ao enviar por UART e SDIO (%s)", esp_err_to_name(err));
                     }
                 }
             }

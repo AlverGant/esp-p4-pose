@@ -202,6 +202,7 @@ esp_err_t telegram_send_photo(const uint8_t *image_data, size_t image_len, const
 static void uart_reader_task(void *arg)
 {
     const int uart_port = C6_UART_PORT; // U0TXD/U0RXD
+    ESP_LOGI(TAG, "=== UART READER TASK STARTED ===");
     // Driver and params are set in app_main(). Just ensure RX buffer exists.
     if (!uart_is_driver_installed(uart_port)) {
         (void)uart_driver_install(uart_port, 1024, 0, 0, NULL, 0);
@@ -211,25 +212,36 @@ static void uart_reader_task(void *arg)
     const int64_t cooldown = (int64_t)CONFIG_TELEGRAM_COOLDOWN_SEC * 1000000LL;
     char line[256]; size_t n = 0;
     uint8_t ch;
+    ESP_LOGI(TAG, "UART reader: waiting for messages...");
     for (;;) {
         int r = uart_read_bytes(uart_port, &ch, 1, pdMS_TO_TICKS(100));
         if (r == 1) {
             if (ch == '\n' || ch == '\r') {
-                line[n] = 0; n = 0;
-                if (line[0]) {
+                line[n] = 0;
+                if (n > 0 && line[0]) {
+                    // Log every line temporarily for debugging
+                    if (line[0] == 'F') {
+                        ESP_LOGI(TAG, "UART DEBUG: Got line starting with 'F': '%s' (len=%d)", line, n);
+                    }
+                    // Check for FALL message first
                     if (strncmp(line, "FALL", 4) == 0) {
+                        ESP_LOGI(TAG, "!!! FALL DETECTED !!! Sending to Telegram: '%s'", line);
                         send_response("C6: FALL recebido");
                         send_response(line); // echo de confirmação
                         int64_t now = esp_timer_get_time();
                         if (now - last_sent >= cooldown) {
+                            ESP_LOGI(TAG, "Calling telegram_send()...");
                             telegram_send(line);
                             last_sent = now;
+                            ESP_LOGI(TAG, "Telegram sent successfully");
                         } else {
                             ESP_LOGI(TAG, "Cooldown active, skipping");
                             send_response("C6: Cooldown, ignorado");
                         }
                     }
+                    // Don't log ESP-IDF log lines to avoid feedback loop
                 }
+                n = 0;  // Reset buffer after processing line
             } else if (n < sizeof(line)-1) {
                 line[n++] = (char)ch;
             } else {
@@ -261,10 +273,10 @@ void app_main(void)
             .source_clk = UART_SCLK_DEFAULT,
         };
         uart_param_config(uart_port, &uc);
-        // Fix to working pins discovered in testing
-        // TX=GPIO17, RX=GPIO16 (UART0)
-        uart_set_pin(uart_port, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-        ESP_LOGI(TAG, "C6: UART0 configured TX=17, RX=16");
+        // Use default UART0 pins (connected to P4 via hardware)
+        // Leave pins as default - hardware routes to P4 GPIO35/36
+        uart_set_pin(uart_port, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+        ESP_LOGI(TAG, "C6: UART0 configured with default pins (connected to P4)");
         if (!uart_is_driver_installed(uart_port)) {
             uart_driver_install(uart_port, 1024, 0, 0, NULL, 0);
         }
