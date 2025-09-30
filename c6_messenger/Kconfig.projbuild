@@ -1,0 +1,37 @@
+menu "c6_messenger Configuration"
+
+config WIFI_SSID
+    string "Wi‑Fi SSID"
+    default ""
+    help
+        Nome da rede Wi‑Fi para conectar (STA).
+
+config WIFI_PASSWORD
+    string "Wi‑Fi Password"
+    default ""
+    help
+        Senha da rede Wi‑Fi (deixe vazio para redes OPEN).
+
+config TELEGRAM_BOT_TOKEN
+    string "Telegram Bot Token"
+    default ""
+    help
+        Token do bot no formato 123456789:ABC... (NÃO comitar).
+
+config TELEGRAM_CHAT_ID
+    string "Telegram Chat ID"
+    default ""
+    help
+        Chat ID de destino (usuário/grupo) para enviar mensagens.
+
+config TELEGRAM_COOLDOWN_SEC
+    int "Cooldown entre mensagens (s)"
+    default 60
+    range 0 86400
+
+config UART_BAUD
+    int "UART baud rate"
+    default 115200
+    range 1200 3000000
+
+endmenu

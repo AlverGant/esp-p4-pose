@@ -1,0 +1,187 @@
+menu "Example Configuration"
+
+    config EXAMPLE_ENABLE_MIPI_CSI_CAM_SENSOR
+        bool "Enable MIPI CSI Camera Sensor"
+        default y
+        depends on SOC_MIPI_CSI_SUPPORTED
+
+    if EXAMPLE_ENABLE_MIPI_CSI_CAM_SENSOR
+        config EXAMPLE_MIPI_CSI_SCCB_I2C_PORT
+            int "MIPI CSI SCCB I2C Port Number"
+            default 0
+            range 0 1
+
+        config EXAMPLE_MIPI_CSI_SCCB_I2C_SCL_PIN
+            int "MIPI CSI SCCB I2C SCL Pin"
+            default 34
+            range -1 56
+
+        config EXAMPLE_MIPI_CSI_SCCB_I2C_SDA_PIN
+            int "MIPI CSI SCCB I2C SDA Pin"
+            default 31
+            range -1 56
+
+        config EXAMPLE_MIPI_CSI_SCCB_I2C_FREQ
+            int "MIPI CSI SCCB I2C Frequency"
+            default 100000
+            range 100000 400000
+
+        config EXAMPLE_MIPI_CSI_CAM_SENSOR_RESET_PIN
+            int "MIPI CSI Camera Sensor Reset Pin"
+            default -1
+            range -1 56
+
+        config EXAMPLE_MIPI_CSI_CAM_SENSOR_PWDN_PIN
+            int "MIPI CSI Camera Sensor Power Down Pin"
+            default -1
+            range -1 56
+    endif
+
+endmenu
+
+# SDIO messenger removed; UART-only path enabled
+
+menu "Network & Telegram"
+
+    config WIFI_SSID
+        string "Wi-Fi SSID"
+        default ""
+
+    config WIFI_PASSWORD
+        string "Wi-Fi Password"
+        default ""
+
+    config TELEGRAM_ENABLE
+        bool "Enable Telegram notifications"
+        default n
+
+    config TELEGRAM_BOT_TOKEN
+        string "Telegram Bot Token (botXXXX:token)"
+        default ""
+        depends on TELEGRAM_ENABLE
+
+    config TELEGRAM_CHAT_ID
+        string "Telegram Chat ID"
+        default ""
+        depends on TELEGRAM_ENABLE
+
+    config TELEGRAM_COOLDOWN_SEC
+        int "Cooldown between messages (seconds)"
+        default 60
+        range 5 3600
+        depends on TELEGRAM_ENABLE
+
+endmenu
+
+menu "Co-processor Messenger (UART)"
+
+    config COPROC_UART_ENABLE
+        bool "Enable UART messenger output"
+        default y
+
+    config COPROC_UART_NUM
+        int "UART port number"
+        default 2
+        range 0 2
+        depends on COPROC_UART_ENABLE
+
+    config COPROC_UART_TX_PIN
+        int "UART TX GPIO (P4 -> C6 RX)"
+        default 35
+        range -1 56
+        depends on COPROC_UART_ENABLE
+
+    config COPROC_UART_RX_PIN
+        int "UART RX GPIO (optional)"
+        default 36
+        range -1 56
+        depends on COPROC_UART_ENABLE
+
+    config COPROC_UART_BAUD
+        int "UART baud rate"
+        default 115200
+        range 9600 2000000
+        depends on COPROC_UART_ENABLE
+
+    config COPROC_MSG_TEMPLATE
+        string "Message template on fall"
+        default "FALL persons=%d age_ms=%d seq=%d"
+        depends on COPROC_UART_ENABLE
+
+    config COPROC_COOLDOWN_SEC
+        int "UART message cooldown (seconds)"
+        default 10
+        range 1 3600
+        depends on COPROC_UART_ENABLE
+
+    config COPROC_LOG_TEST_ONLY
+        bool "Only start co-processor UART logs (skip display/camera)"
+        default n
+        help
+            Enable this to run a minimal app that only initializes the
+            co-processor UART and prints C6 logs to the console. Useful
+            for wiring/pin mux diagnostics without display/camera enabled.
+
+endmenu
+
+menu "C6 Flash Bridge"
+
+    config C6_BRIDGE_ENABLE
+        bool "Enable C6 flash bridge (USB<->UART)"
+        default y
+
+    config C6_BRIDGE_BTN_GPIO
+        int "Trigger button GPIO (pressed at boot enters bridge)"
+        default 3
+        range 0 56
+        depends on C6_BRIDGE_ENABLE
+
+    config C6_EN_GPIO
+        int "C6_EN GPIO (reset)"
+        default 9
+        range 0 56
+        depends on C6_BRIDGE_ENABLE
+
+    config C6_BOOT_GPIO
+        int "C6_BOOT GPIO (boot strap)"
+        default 34
+        range 0 56
+        depends on C6_BRIDGE_ENABLE
+
+    config C6_BRIDGE_UART_NUM
+        int "UART port connected to C6"
+        default 1
+        range 0 2
+        depends on C6_BRIDGE_ENABLE
+
+    config C6_BRIDGE_UART_TX
+        int "UART TX GPIO (P4->C6 RX)"
+        default 35
+        range 0 56
+        depends on C6_BRIDGE_ENABLE
+
+    config C6_BRIDGE_UART_RX
+        int "UART RX GPIO (P4<-C6 TX)"
+        default 36
+        range 0 56
+        depends on C6_BRIDGE_ENABLE
+
+    config C6_BRIDGE_BAUD
+        int "Bridge baud"
+        default 115200
+        range 9600 2000000
+        depends on C6_BRIDGE_ENABLE
+
+    config C6_BRIDGE_RETRIGGER_BTN_GPIO
+        int "Re-trigger button GPIO (long press forces C6 download)"
+        default 4
+        range 0 56
+        depends on C6_BRIDGE_ENABLE
+
+    config C6_BRIDGE_RETRIGGER_HOLD_MS
+        int "Re-trigger hold time (ms)"
+        default 2000
+        range 200 10000
+        depends on C6_BRIDGE_ENABLE
+
+endmenu

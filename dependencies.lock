@@ -1,0 +1,221 @@
+dependencies:
+  button:
+    dependencies:
+    - name: espressif/cmake_utilities
+      version: 0.*
+    - name: idf
+      version: '>=4.0'
+    source:
+      path: /home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__button
+      type: local
+    version: 3.5.0
+  esp32_p4_eye:
+    dependencies:
+    - name: idf
+      version: '>=5.4'
+    - name: lvgl/lvgl
+      version: ^8
+    - name: espressif/esp_lvgl_port
+      public: true
+      version: ^2
+    - name: espressif/button
+      public: true
+      version: '>=2.5,<4.0'
+    - name: espressif/esp_codec_dev
+      public: true
+      version: ^1
+    - name: espressif/esp_video
+      public: true
+      version: 0.9.*
+    - name: espressif/knob
+      version: ^1.0.0
+    source:
+      path: /home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/common_components/esp32_p4_eye
+      type: local
+    targets:
+    - esp32p4
+    version: 0.0.1
+  espressif/cmake_utilities:
+    dependencies:
+    - name: idf
+      version: '>=4.1'
+    source:
+      path: /home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__cmake_utilities
+      type: local
+    version: 0.5.3
+  espressif/coco_pose:
+    dependencies:
+    - name: espressif/esp-dl
+      override_path: ../../esp-dl
+      version: ^3.1.5
+    source:
+      path: /home/alvaro/Downloads/esp-dl/models/coco_pose
+      type: local
+    version: 0.2.0
+  espressif/dl_fft:
+    component_hash: 7dadbd644c0d7ba4733cc3726ec4cff6edf27b043725e1115861dec1609a3d28
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 0.3.1
+  espressif/esp-dl:
+    dependencies:
+    - name: idf
+      version: '>=5.3'
+    - name: espressif/esp_new_jpeg
+      version: ^0.6.1
+    - name: espressif/dl_fft
+      version: '>=0.3.1'
+    source:
+      path: /home/alvaro/Downloads/esp-dl/esp-dl
+      type: local
+    targets:
+    - esp32
+    - esp32s3
+    - esp32p4
+    version: 3.1.5
+  espressif/esp_audio_codec:
+    dependencies:
+    - name: idf
+      version: '>=4.4'
+    source:
+      path: /home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_audio_codec
+      type: local
+    version: 2.3.0
+  espressif/esp_cam_sensor:
+    dependencies:
+    - name: espressif/cmake_utilities
+      version: 0.*
+    - name: espressif/esp_sccb_intf
+      version: '>=0.0.2'
+    - name: idf
+      version: '>=5.3'
+    source:
+      path: /home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_cam_sensor
+      type: local
+    targets:
+    - esp32p4
+    version: 1.0.0
+  espressif/esp_codec_dev:
+    dependencies:
+    - name: idf
+      version: '>=4.0'
+    source:
+      path: /home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_codec_dev
+      type: local
+    version: 1.5.0
+  espressif/esp_h264:
+    dependencies:
+    - name: idf
+      version: '>=4.4'
+    source:
+      path: /home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_h264
+      type: local
+    version: 1.0.3
+  espressif/esp_ipa:
+    dependencies:
+    - name: espressif/cmake_utilities
+      version: 0.*
+    - name: idf
+      version: '>=5.4'
+    source:
+      path: /home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_ipa
+      type: local
+    targets:
+    - esp32p4
+    version: 0.3.0~1
+  espressif/esp_lvgl_port:
+    dependencies:
+    - name: idf
+      version: '>=5.1'
+    - name: lvgl/lvgl
+      public: true
+      version: '>=8,<10'
+    source:
+      path: /home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_lvgl_port
+      type: local
+    version: 2.6.2
+  espressif/esp_new_jpeg:
+    dependencies: []
+    source:
+      path: /home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_new_jpeg
+      type: local
+    targets:
+    - esp32
+    - esp32s2
+    - esp32s3
+    - esp32p4
+    - esp32c2
+    - esp32c3
+    - esp32c5
+    - esp32c6
+    version: 0.6.1
+  espressif/esp_sccb_intf:
+    dependencies:
+    - name: idf
+      version: '>=5.3'
+    source:
+      path: /home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_sccb_intf
+      type: local
+    version: 0.0.5
+  espressif/esp_video:
+    dependencies:
+    - name: espressif/cmake_utilities
+      version: 0.*
+    - name: espressif/esp_cam_sensor
+      version: 1.0.*
+    - name: espressif/esp_h264
+      version: '>=1.0.3'
+    - name: espressif/esp_ipa
+      version: 0.3.*
+    - name: idf
+      version: '>=5.4'
+    source:
+      path: /home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_video
+      type: local
+    targets:
+    - esp32p4
+    version: 0.9.0
+  espressif/knob:
+    dependencies:
+    - name: espressif/cmake_utilities
+      version: 0.*
+    - name: idf
+      version: '>=4.4.1'
+    source:
+      path: /home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__knob
+      type: local
+    version: 1.0.0
+  idf:
+    source:
+      type: idf
+    version: 5.5.1
+  lvgl/lvgl:
+    dependencies: []
+    source:
+      path: /home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/lvgl__lvgl
+      type: local
+    version: 8.4.0
+direct_dependencies:
+- button
+- esp32_p4_eye
+- espressif/cmake_utilities
+- espressif/coco_pose
+- espressif/esp_audio_codec
+- espressif/esp_cam_sensor
+- espressif/esp_codec_dev
+- espressif/esp_h264
+- espressif/esp_ipa
+- espressif/esp_lvgl_port
+- espressif/esp_new_jpeg
+- espressif/esp_sccb_intf
+- espressif/esp_video
+- espressif/knob
+- lvgl/lvgl
+manifest_hash: 646590c5e920dd9f9704274bf916737eb4279b6c4ab146246165700b20f2a71c
+target: esp32p4
+version: 2.0.0

@@ -1,0 +1,7 @@
+source "/home/alvaro/Downloads/esp-idf/components/bootloader/Kconfig.projbuild"
+source "/home/alvaro/Downloads/esp-idf/components/esp_app_format/Kconfig.projbuild"
+source "/home/alvaro/Downloads/esp-idf/components/esp_rom/Kconfig.projbuild"
+source "/home/alvaro/Downloads/esp-idf/components/esp_tee/Kconfig.projbuild"
+source "/home/alvaro/Downloads/esp-idf/components/esptool_py/Kconfig.projbuild"
+source "/home/alvaro/Downloads/esp-idf/components/partition_table/Kconfig.projbuild"
+source "/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/Kconfig.projbuild"

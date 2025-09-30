@@ -1,0 +1,21 @@
+idf_component_register(
+  SRCS
+    "app_main.c"
+    "app_video.c"
+    "app_video_utils.c"
+    "pose_overlay.cpp"
+    "net_telegram.c"
+    "fall_notifier.c"
+    "coproc_uart.c"
+    "coproc_sdio.c"
+    "c6_flash_bridge.c"
+  INCLUDE_DIRS "."
+  REQUIRES
+    esp_serial_slave_link
+    nvs_flash
+    esp_event
+    esp_netif
+    esp_wifi
+    esp_http_client
+    mbedtls
+)

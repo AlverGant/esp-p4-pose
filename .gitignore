@@ -1,0 +1,37 @@
+# Diretórios de build
+/build/
+/cmake-build-*/
+
+# Arquivos de configuração locais
+sdkconfig
+sdkconfig.old
+CMakeCache.txt
+
+# Arquivos de dependências e lockfiles locais
+*.log
+*.pyc
+__pycache__/
+*.swp
+*.swo
+
+# Saída de firmware
+*.elf
+*.bin
+*.map
+*.hex
+*.dump
+
+# IDEs
+.vscode/
+.idea/
+*.code-workspace
+
+# Arquivos de backup
+*~
+*.bak
+*.orig
+
+# Outros arquivos temporários
+.DS_Store
+Thumbs.db
+

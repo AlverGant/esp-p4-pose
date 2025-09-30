@@ -1,0 +1,37 @@
+menu "Wi-Fi"
+
+    config WIFI_SSID
+        string "Wi-Fi SSID"
+        default ""
+
+    config WIFI_PASSWORD
+        string "Wi-Fi Password"
+        default ""
+
+endmenu
+
+menu "Telegram"
+
+    config TELEGRAM_BOT_TOKEN
+        string "Telegram Bot Token (botXXXX:token)"
+        default ""
+
+    config TELEGRAM_CHAT_ID
+        string "Telegram Chat ID"
+        default ""
+
+    config TELEGRAM_COOLDOWN_SEC
+        int "Cooldown entre mensagens (s)"
+        default 60
+        range 5 3600
+
+endmenu
+
+menu "UART Input"
+
+    config UART_BAUD
+        int "UART baud"
+        default 115200
+        range 9600 2000000
+
+endmenu
