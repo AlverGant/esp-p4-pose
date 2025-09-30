@@ -13,11 +13,13 @@
 #include "esp_netif.h"
 #include "esp_wifi.h"
 #include "esp_http_client.h"
+#include "esp_err.h"
 #include "esp_timer.h"
 #include "driver/uart.h"
 #include "esp_sntp.h"
 #include "esp_crt_bundle.h"
 #include "coproc_sdio_slave.h"
+#include "hosted_alert_server.h"
 
 static const char *TAG = "c6_msg";
 static const int C6_UART_PORT = UART_NUM_0;
@@ -52,28 +54,103 @@ static void send_response(const char *s)
 // Global variables for message handling
 static int64_t s_last_sent = 0;
 static int64_t s_cooldown = 0;
+static portMUX_TYPE s_fall_spin = portMUX_INITIALIZER_UNLOCKED;
+
+static esp_err_t handle_fall_alert(const char *message, const char *transport, bool feedback);
+static esp_err_t handle_incoming_message(const char *message, const char *transport, bool feedback);
+
+#if CONFIG_HOSTED_ALERT_SERVER_ENABLE
+static hosted_alert_result_t hosted_alert_callback(const char *message, size_t len)
+{
+    (void)len;
+    if (!message || !*message) {
+        return HOSTED_ALERT_RESULT_IGNORED;
+    }
+
+    esp_err_t err = handle_incoming_message(message, "HTTP", false);
+    if (err == ESP_OK) {
+        return HOSTED_ALERT_RESULT_OK;
+    }
+    if (err == ESP_ERR_INVALID_STATE) {
+        return HOSTED_ALERT_RESULT_COOLDOWN;
+    }
+    if (err == ESP_ERR_INVALID_ARG) {
+        return HOSTED_ALERT_RESULT_IGNORED;
+    }
+    return HOSTED_ALERT_RESULT_ERROR;
+}
+#endif
 
 // SDIO message handler
 static void sdio_message_handler(const char *message)
 {
-    if (!message || !*message) return;
+    if (!message || !*message) {
+        return;
+    }
+    (void)handle_incoming_message(message, "SDIO", true);
+}
 
-    ESP_LOGI(TAG, "SDIO RX: %s", message);
-    send_response("C6: SDIO msg recebida");
+static esp_err_t handle_fall_alert(const char *message, const char *transport, bool feedback)
+{
+    ESP_LOGI(TAG, "%s FALL: %s", transport, message);
 
-    // Check if it's a FALL message
-    if (strncmp(message, "FALL", 4) == 0) {
-        send_response("C6: FALL recebido via SDIO");
-        send_response(message); // echo
-        int64_t now = esp_timer_get_time();
-        if (now - s_last_sent >= s_cooldown) {
-            telegram_send(message);
-            s_last_sent = now;
-        } else {
-            ESP_LOGI(TAG, "Cooldown active, skipping");
-            send_response("C6: Cooldown, ignorado");
+    if (feedback) {
+        char ack[64];
+        snprintf(ack, sizeof(ack), "C6: FALL recebido via %s", transport);
+        send_response(ack);
+        send_response(message);
+    }
+
+    int64_t now = esp_timer_get_time();
+    if (s_cooldown > 0) {
+        int64_t last;
+        portENTER_CRITICAL(&s_fall_spin);
+        last = s_last_sent;
+        portEXIT_CRITICAL(&s_fall_spin);
+
+        int64_t elapsed = now - last;
+        if (elapsed < s_cooldown) {
+            ESP_LOGI(TAG, "%s cooldown ativo (%lld ms restantes)", transport,
+                     (long long)((s_cooldown - elapsed) / 1000));
+            if (feedback) {
+                send_response("C6: Cooldown, ignorado");
+            }
+            return ESP_ERR_INVALID_STATE;
         }
     }
+
+    esp_err_t err = telegram_send(message);
+    if (err == ESP_OK) {
+        portENTER_CRITICAL(&s_fall_spin);
+        s_last_sent = esp_timer_get_time();
+        portEXIT_CRITICAL(&s_fall_spin);
+    } else if (feedback) {
+        char line[64];
+        snprintf(line, sizeof(line), "C6: Telegram erro %d", (int)err);
+        send_response(line);
+    }
+    return err;
+}
+
+static esp_err_t handle_incoming_message(const char *message, const char *transport, bool feedback)
+{
+    if (!message || !*message) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ESP_LOGI(TAG, "%s RX: %s", transport, message);
+
+    if (feedback) {
+        char ack[64];
+        snprintf(ack, sizeof(ack), "C6: %s msg recebida", transport);
+        send_response(ack);
+    }
+
+    if (strncmp(message, "FALL", 4) == 0) {
+        return handle_fall_alert(message, transport, feedback);
+    }
+
+    return ESP_ERR_INVALID_ARG;
 }
 
 static esp_err_t wifi_connect(void)
@@ -208,8 +285,6 @@ static void uart_reader_task(void *arg)
         (void)uart_driver_install(uart_port, 1024, 0, 0, NULL, 0);
     }
 
-    int64_t last_sent = 0;
-    const int64_t cooldown = (int64_t)CONFIG_TELEGRAM_COOLDOWN_SEC * 1000000LL;
     char line[256]; size_t n = 0;
     uint8_t ch;
     ESP_LOGI(TAG, "UART reader: waiting for messages...");
@@ -225,19 +300,7 @@ static void uart_reader_task(void *arg)
                     }
                     // Check for FALL message first
                     if (strncmp(line, "FALL", 4) == 0) {
-                        ESP_LOGI(TAG, "!!! FALL DETECTED !!! Sending to Telegram: '%s'", line);
-                        send_response("C6: FALL recebido");
-                        send_response(line); // echo de confirmação
-                        int64_t now = esp_timer_get_time();
-                        if (now - last_sent >= cooldown) {
-                            ESP_LOGI(TAG, "Calling telegram_send()...");
-                            telegram_send(line);
-                            last_sent = now;
-                            ESP_LOGI(TAG, "Telegram sent successfully");
-                        } else {
-                            ESP_LOGI(TAG, "Cooldown active, skipping");
-                            send_response("C6: Cooldown, ignorado");
-                        }
+                        (void)handle_incoming_message(line, "UART", true);
                     }
                     // Don't log ESP-IDF log lines to avoid feedback loop
                 }
@@ -300,6 +363,18 @@ void app_main(void)
     ESP_LOGI(TAG, "=== STARTING WIFI ===");
     wifi_connect();
     sntp_sync();
+
+#if CONFIG_HOSTED_ALERT_SERVER_ENABLE
+    {
+        esp_err_t http_err = hosted_alert_server_start(hosted_alert_callback);
+        if (http_err == ESP_OK) {
+            ESP_LOGI(TAG, "Hosted alert HTTP server iniciado na porta %d", CONFIG_HOSTED_ALERT_SERVER_PORT);
+            send_response("C6: Servidor HTTP pronto para alertas");
+        } else {
+            ESP_LOGW(TAG, "Falha ao iniciar servidor HTTP: %s", esp_err_to_name(http_err));
+        }
+    }
+#endif
 
     if (sdio_ret == ESP_OK) {
         send_response("C6: Sistema iniciado com SDIO+UART");
