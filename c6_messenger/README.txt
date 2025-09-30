@@ -7,6 +7,7 @@ Usage
 - Configure: idf.py menuconfig
   - Wi‑Fi/Telegram credentials
   - UART baud
+- (Opcional) configure o servidor HTTP de alertas (porta e tamanho máximo)
 - Flash/monitor: idf.py -p <PORT> flash monitor
 
 Wiring
@@ -20,3 +21,10 @@ Notes
 Protocol
 - One line per event, terminated with '\n'.
 - Lines starting with "FALL" trigger a Telegram message.
+- Alertas também podem ser enviados via HTTP (ESP-Hosted):
+  - Endpoint: POST http://<ip-do-c6>:<porta>/alert
+  - Corpo: texto simples com a linha (ex: "FALL persons=1 age_ms=200 seq=42")
+  - Respostas:
+      * 200/JSON `{ "status": "sent" }` quando enviado ao Telegram
+      * 429/JSON `{ "status": "cooldown" }` se ainda estiver no intervalo de cooldown
+      * 204 quando o corpo não contém um alerta reconhecido

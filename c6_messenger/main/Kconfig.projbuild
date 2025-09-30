@@ -27,6 +27,26 @@ menu "Telegram"
 
 endmenu
 
+menu "ESP-Hosted Alerts"
+
+    config HOSTED_ALERT_SERVER_ENABLE
+        bool "Habilitar servidor HTTP para alertas do P4"
+        default y
+
+    config HOSTED_ALERT_SERVER_PORT
+        int "Porta HTTP para receber alertas"
+        default 8080
+        range 1 65535
+        depends on HOSTED_ALERT_SERVER_ENABLE
+
+    config HOSTED_ALERT_MAX_BODY_LEN
+        int "Tamanho máximo da mensagem (bytes)"
+        default 256
+        range 64 2048
+        depends on HOSTED_ALERT_SERVER_ENABLE
+
+endmenu
+
 menu "UART Input"
 
     config UART_BAUD
