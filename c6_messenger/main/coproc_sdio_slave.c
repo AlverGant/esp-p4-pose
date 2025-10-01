@@ -52,11 +52,29 @@ static void sdio_slave_tx_task(void *arg)
     ESP_LOGI(TAG_SDIO, "SDIO slave TX task started");
 
     for (;;) {
-        if (xQueueReceive(s_tx_queue, &tx_msg, portMAX_DELAY) == pdTRUE) {
+        // SEMPRE verificar e recuperar buffers finalizados PRIMEIRO
+        // Isso evita que buffers fiquem presos quando P4 não está lendo
+        void *finished_arg = NULL;
+        int recovered = 0;
+        while (sdio_slave_send_get_finished(&finished_arg, 0) == ESP_OK) {
+            uint8_t *finished_buf = (uint8_t*)finished_arg;
+            xQueueSend(s_tx_buffer_pool, &finished_buf, 0);
+            recovered++;
+        }
+        if (recovered > 0) {
+            ESP_LOGD(TAG_SDIO, "Recovered %d TX buffers", recovered);
+        }
+
+        // Tentar receber mensagem da fila com timeout curto
+        if (xQueueReceive(s_tx_queue, &tx_msg, pdMS_TO_TICKS(100)) == pdTRUE) {
             // Get a buffer from the pool
             uint8_t *tx_buf = NULL;
-            if (xQueueReceive(s_tx_buffer_pool, &tx_buf, pdMS_TO_TICKS(1000)) != pdTRUE) {
-                ESP_LOGW(TAG_SDIO, "No TX buffer available");
+            if (xQueueReceive(s_tx_buffer_pool, &tx_buf, pdMS_TO_TICKS(100)) != pdTRUE) {
+                // Se não há buffer disponível, descartar mensagem antiga
+                static int drop_count = 0;
+                if (++drop_count % 10 == 1) {  // Log apenas a cada 10 drops
+                    ESP_LOGW(TAG_SDIO, "No TX buffer available (dropped %d msgs)", drop_count);
+                }
                 continue;
             }
 
@@ -65,7 +83,7 @@ static void sdio_slave_tx_task(void *arg)
 
             // Send the message using PACKET mode API
             // arg will be the buffer pointer so we can return it to pool later
-            esp_err_t ret = sdio_slave_send_queue(tx_buf, sizeof(tx_msg), tx_buf, portMAX_DELAY);
+            esp_err_t ret = sdio_slave_send_queue(tx_buf, sizeof(tx_msg), tx_buf, pdMS_TO_TICKS(100));
             if (ret == ESP_OK) {
                 ESP_LOGI(TAG_SDIO, "SDIO response sent: %s", tx_msg.data);
             } else {
@@ -73,13 +91,6 @@ static void sdio_slave_tx_task(void *arg)
                 // Return buffer to pool on error
                 xQueueSend(s_tx_buffer_pool, &tx_buf, 0);
             }
-        }
-
-        // Check for finished sends and return buffers to pool
-        void *finished_arg = NULL;
-        while (sdio_slave_send_get_finished(&finished_arg, 0) == ESP_OK) {
-            uint8_t *finished_buf = (uint8_t*)finished_arg;
-            xQueueSend(s_tx_buffer_pool, &finished_buf, 0);
         }
     }
 }

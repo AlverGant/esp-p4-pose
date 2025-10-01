@@ -31,7 +31,15 @@ static void uart_tx_line(const char *s)
     size_t n = strnlen(s, sizeof(buf) - 2);
     memcpy(buf, s, n);
     buf[n++] = '\n';
-    uart_write_bytes(C6_UART_PORT, buf, n);
+
+    // CRITICAL FIX: Add flush like p4_sdio_flash does
+    int written = uart_write_bytes(C6_UART_PORT, buf, n);
+    if (written > 0) {
+        esp_err_t flush_ret = uart_wait_tx_done(C6_UART_PORT, pdMS_TO_TICKS(1000));
+        ESP_LOGI(TAG, "TX: %d bytes (flush=%s)", written, esp_err_to_name(flush_ret));
+    } else {
+        ESP_LOGW(TAG, "TX failed: uart_write_bytes returned %d", written);
+    }
 }
 
 // Forward declaration
@@ -40,10 +48,10 @@ esp_err_t telegram_send(const char *text);
 // Combined function that sends via SDIO and UART
 static void send_response(const char *s)
 {
-    // Try SDIO first
+    // Try SDIO first (only works with main P4 app, not p4_sdio_flash)
     esp_err_t ret = coproc_sdio_slave_send_line(s);
     if (ret != ESP_OK) {
-        // Fallback to UART
+        // Fallback to UART if SDIO fails or not available
         uart_tx_line(s);
     }
 }
@@ -280,35 +288,63 @@ static void uart_reader_task(void *arg)
 {
     const int uart_port = C6_UART_PORT; // U0TXD/U0RXD
     ESP_LOGI(TAG, "=== UART READER TASK STARTED ===");
-    // Driver and params are set in app_main(). Just ensure RX buffer exists.
+    // Ensure UART driver with large buffers to prevent blocking
     if (!uart_is_driver_installed(uart_port)) {
-        (void)uart_driver_install(uart_port, 1024, 0, 0, NULL, 0);
+        ESP_LOGI(TAG, "Installing UART%d driver (RX=4096, TX=2048)", uart_port);
+        uart_driver_install(uart_port, 4096, 2048, 0, NULL, 0);
+    } else {
+        ESP_LOGI(TAG, "UART%d driver already installed", uart_port);
     }
 
     char line[256]; size_t n = 0;
     uint8_t ch;
+    int heartbeat_counter = 0;
     ESP_LOGI(TAG, "UART reader: waiting for messages...");
+
+    // Force immediate heartbeat to confirm task is running
+    ESP_LOGI(TAG, "UART reader entering main loop (port=%d)", uart_port);
+
     for (;;) {
         int r = uart_read_bytes(uart_port, &ch, 1, pdMS_TO_TICKS(100));
+
+        // Heartbeat every 10 seconds to show task is alive
+        if (++heartbeat_counter >= 100) {  // 100 * 100ms = 10s
+            ESP_LOGI(TAG, "UART reader heartbeat (still running, n=%d)", n);
+            heartbeat_counter = 0;
+        }
+
         if (r == 1) {
+            // Debug: log first byte received
+            static bool first_byte_logged = false;
+            if (!first_byte_logged) {
+                ESP_LOGI(TAG, "UART: First byte received: 0x%02X '%c'", ch, (ch >= 32 && ch < 127) ? ch : '?');
+                first_byte_logged = true;
+            }
+
             if (ch == '\n' || ch == '\r') {
                 line[n] = 0;
                 if (n > 0 && line[0]) {
-                    // Log every line temporarily for debugging
-                    if (line[0] == 'F') {
-                        ESP_LOGI(TAG, "UART DEBUG: Got line starting with 'F': '%s' (len=%d)", line, n);
-                    }
+                    // Log EVERY line for debugging
+                    ESP_LOGI(TAG, "UART RX line (len=%d): %s", n, line);
+
+                    // CRITICAL: ALWAYS respond to P4 for debug
+                    char ack[128];
+                    snprintf(ack, sizeof(ack), "C6_ACK: Received %d bytes", n);
+                    uart_tx_line(ack);
+                    ESP_LOGI(TAG, "Sent ACK back to P4");
+
                     // Check for FALL message first
                     if (strncmp(line, "FALL", 4) == 0) {
+                        ESP_LOGI(TAG, "*** FALL MESSAGE DETECTED ***");
                         (void)handle_incoming_message(line, "UART", true);
                     }
-                    // Don't log ESP-IDF log lines to avoid feedback loop
                 }
                 n = 0;  // Reset buffer after processing line
             } else if (n < sizeof(line)-1) {
                 line[n++] = (char)ch;
             } else {
                 // overflow, reset
+                ESP_LOGW(TAG, "UART buffer overflow, resetting");
                 n = 0;
             }
         }
@@ -317,16 +353,34 @@ static void uart_reader_task(void *arg)
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "=== C6 APP_MAIN START - FIRMWARE VERSION 2025-09-30-SDIO-FIRST ===");
+    ESP_LOGI(TAG, "=== C6 APP_MAIN START - FIRMWARE VERSION 2025-10-01-UART-TEST ===");
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_LOGI(TAG, "=== NVS INIT OK ===");
 
     // Initialize cooldown from config
     s_cooldown = (int64_t)CONFIG_TELEGRAM_COOLDOWN_SEC * 1000000LL;
 
-    // Ensure UART0 is ready before any uart_tx_line() - keep as backup
+    // IMPORTANTE: Resetar timestamp de último envio para evitar cooldown fantasma no boot
+    portENTER_CRITICAL(&s_fall_spin);
+    s_last_sent = 0;
+    portEXIT_CRITICAL(&s_fall_spin);
+    ESP_LOGI(TAG, "Cooldown resetado (config: %lld segundos)", (long long)(s_cooldown / 1000000LL));
+
+    // Configure UART0 with EXPLICIT pins for P4 connection
+    // ESP32-P4-Function-EV-Board schematic shows:
+    // - C6 Pin 31 (TXD0) = GPIO16 (U0TXD default) → connects to P4 GPIO36 (UART2 RX)
+    // - C6 Pin 30 (RXD0) = GPIO17 (U0RXD default) → connects to P4 GPIO35 (UART2 TX)
     {
-        const int uart_port = C6_UART_PORT;
+        const int uart_port = C6_UART_PORT;  // UART_NUM_0
+
+        // CRITICAL: If console was using UART0, delete it first!
+        if (uart_is_driver_installed(uart_port)) {
+            ESP_LOGW(TAG, "UART0 driver already installed (probably console), deleting...");
+            uart_driver_delete(uart_port);
+            vTaskDelay(pdMS_TO_TICKS(100));  // Give time for cleanup
+            ESP_LOGI(TAG, "UART0 driver deleted, will reinstall for P4 communication");
+        }
+
         uart_config_t uc = {
             .baud_rate = CONFIG_UART_BAUD,
             .data_bits = UART_DATA_8_BITS,
@@ -335,15 +389,21 @@ void app_main(void)
             .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
             .source_clk = UART_SCLK_DEFAULT,
         };
-        uart_param_config(uart_port, &uc);
-        // Use default UART0 pins (connected to P4 via hardware)
-        // Leave pins as default - hardware routes to P4 GPIO35/36
-        uart_set_pin(uart_port, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-        ESP_LOGI(TAG, "C6: UART0 configured with default pins (connected to P4)");
-        if (!uart_is_driver_installed(uart_port)) {
-            uart_driver_install(uart_port, 1024, 0, 0, NULL, 0);
-        }
-        ESP_LOGI(TAG, "=== UART INIT OK ===");
+        ESP_ERROR_CHECK(uart_param_config(uart_port, &uc));
+
+        // CRITICAL: Set pins EXPLICITLY (don't trust defaults)
+        ESP_LOGI(TAG, "Setting UART0 pins explicitly: TX=16, RX=17");
+        ESP_ERROR_CHECK(uart_set_pin(uart_port, 16, 17, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+
+        // Large RX buffer to handle P4 messages, TX buffer for responses
+        ESP_LOGI(TAG, "Installing UART0 driver with RX=4096, TX=2048");
+        ESP_ERROR_CHECK(uart_driver_install(uart_port, 4096, 2048, 0, NULL, 0));
+
+        // Clear any garbage from previous console use
+        uart_flush(uart_port);
+        uart_flush_input(uart_port);
+
+        ESP_LOGI(TAG, "=== UART0 INIT OK: GPIO16(TX)→P4_GPIO36, GPIO17(RX)←P4_GPIO35 ===");
     }
 
     // Initialize SDIO slave BEFORE Wi-Fi - must be ready when P4 connects
@@ -362,6 +422,20 @@ void app_main(void)
     // Start Wi-Fi after SDIO is ready
     ESP_LOGI(TAG, "=== STARTING WIFI ===");
     wifi_connect();
+
+    // Send startup message to P4 to confirm C6 is alive
+    ESP_LOGI(TAG, "=== SENDING STARTUP MESSAGE TO P4 ===");
+    vTaskDelay(pdMS_TO_TICKS(1000));  // Wait 1s for P4 to be ready
+    uart_tx_line("C6: Firmware started - waiting for P4 messages");
+    vTaskDelay(pdMS_TO_TICKS(500));
+    uart_tx_line("C6: UART0 ready GPIO16(TX) GPIO17(RX)");
+
+    // Start UART reader BEFORE sntp_sync to ensure we can receive messages during boot
+    // CRITICAL: Must be created before any blocking operations!
+    ESP_LOGI(TAG, "=== STARTING UART READER (before SNTP) ===");
+    xTaskCreate(uart_reader_task, "uart_reader", 4096, NULL, 5, NULL);
+    vTaskDelay(pdMS_TO_TICKS(100)); // Give task time to start
+
     sntp_sync();
 
 #if CONFIG_HOSTED_ALERT_SERVER_ENABLE
@@ -379,7 +453,4 @@ void app_main(void)
     if (sdio_ret == ESP_OK) {
         send_response("C6: Sistema iniciado com SDIO+UART");
     }
-
-    // Start UART reader as backup (will also handle UART-based messages)
-    xTaskCreate(uart_reader_task, "uart_reader", 4096, NULL, 5, NULL);
 }

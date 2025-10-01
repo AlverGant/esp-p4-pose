@@ -277,6 +277,10 @@ SECTIONS
      * dummy bytes to ensure this
      */
     . += 16;
+    /* Align the end of flash text region as per PMP granularity to allow using the
+     * page alignment gap created while mapping the flash region into the PSRAM memory.
+     */
+    . = ALIGN(128);
     _text_end = ABSOLUTE(.);
     /**
      * Mark the flash.text end.
@@ -382,6 +386,10 @@ SECTIONS
     _thread_local_data_start = ABSOLUTE(.);
     *(.tdata .tdata.* .gnu.linkonce.td.*)
     . = ALIGN(ALIGNOF(.flash.tbss));
+    /* Align the end of flash rodata region as per PMP granularity to allow using the
+     * page alignment gap created while mapping the flash region into the PSRAM memory.
+     */
+    . = ALIGN(128);
     _thread_local_data_end = ABSOLUTE(.);
   } > rodata_seg_low
   ASSERT((ADDR(.flash.tbss) == ADDR(.flash.tdata) + SIZEOF(.flash.tdata)), "The gap between .flash.tdata and .flash.tbss must not exist to produce the final bin image.")
@@ -407,6 +415,15 @@ SECTIONS
     arrays[rodata_noload]
     mapping[rodata_noload]
   } > rodata_seg_low
+  /**
+   * This section is required to skip flash sections, because `extern_ram_seg`
+   * and `drom_seg` / `irom_seg` are on the same bus when xip on psram
+   */
+  .ext_ram.dummy (NOLOAD):
+  {
+    . = ORIGIN(ext_ram_seg) + (_rodata_reserved_end - _flash_rodata_dummy_start);
+    . = ALIGN (0x10000);
+  } > ext_ram_seg
   .dram0.bss (NOLOAD) :
   {
     

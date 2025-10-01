@@ -7365,7 +7365,7 @@
                 "id": "SECURE_FLASH_ENCRYPT_ONLY_IMAGE_LEN_IN_APP_PART",
                 "name": "SECURE_FLASH_ENCRYPT_ONLY_IMAGE_LEN_IN_APP_PART",
                 "range": null,
-                "title": "Encrypt only the app image that is present in the partition of type app",
+                "title": "Encrypt contents upto app image length in app partition",
                 "type": "bool"
             },
             {

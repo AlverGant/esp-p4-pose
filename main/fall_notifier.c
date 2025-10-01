@@ -125,22 +125,22 @@ static esp_err_t fall_notifier_send_locked(const char *source_human,
             }
         }
 
+        ESP_LOGI(TAG_NOTIF, "Enviando via UART: %s", line);
         esp_err_t err_uart = coproc_uart_send_line(line);
         if (err_uart == ESP_OK) {
             delivered = true;
             last_err = ESP_OK;
-            ESP_LOGI(TAG_NOTIF, "UART enviado: %s", line);
+            ESP_LOGI(TAG_NOTIF, "UART enviado com sucesso");
         } else {
-            ESP_LOGW(TAG_NOTIF, "UART falhou (%s), tentando SDIO", esp_err_to_name(err_uart));
-            esp_err_t err_sdio = coproc_sdio_send_line(line);
-            if (err_sdio == ESP_OK) {
-                delivered = true;
-                last_err = ESP_OK;
-                ESP_LOGI(TAG_NOTIF, "SDIO enviado: %s", line);
-            } else {
-                last_err = err_sdio;
-                ESP_LOGW(TAG_NOTIF, "Falha ao enviar por UART e SDIO (%s)", esp_err_to_name(err_sdio));
-            }
+            last_err = err_uart;
+            ESP_LOGW(TAG_NOTIF, "UART falhou (%s) - SDIO desabilitado", esp_err_to_name(err_uart));
+            // SDIO fallback disabled to avoid interference
+            // esp_err_t err_sdio = coproc_sdio_send_line(line);
+            // if (err_sdio == ESP_OK) {
+            //     delivered = true;
+            //     last_err = ESP_OK;
+            //     ESP_LOGI(TAG_NOTIF, "SDIO enviado: %s", line);
+            // }
         }
     }
 #endif
@@ -182,13 +182,23 @@ static void notifier_task(void *arg)
 {
     (void)arg;
     bool last_fall = false;
+    int heartbeat = 0;
+
+    ESP_LOGI(TAG_NOTIF, "Fall notifier task started");
 
     for (;;) {
         bool fall = pose_overlay_is_fall_detected();
         int persons = 0, age_ms = 0, seq = 0;
         pose_overlay_get_stats(&persons, &age_ms, &seq);
 
+        // Debug heartbeat a cada 10 segundos
+        if (++heartbeat >= 40) {  // 40 * 250ms = 10s
+            ESP_LOGI(TAG_NOTIF, "Notifier alive: fall=%d persons=%d seq=%d", fall, persons, seq);
+            heartbeat = 0;
+        }
+
         if (fall && !last_fall) {
+            ESP_LOGW(TAG_NOTIF, "*** QUEDA AUTOMÁTICA DETECTADA! Enviando notificação ***");
             (void)fall_notifier_send_event("Queda detectada!", persons, age_ms, seq, false);
         }
         last_fall = fall;

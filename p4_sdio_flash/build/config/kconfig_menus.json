@@ -7365,7 +7365,7 @@
                 "id": "SECURE_FLASH_ENCRYPT_ONLY_IMAGE_LEN_IN_APP_PART",
                 "name": "SECURE_FLASH_ENCRYPT_ONLY_IMAGE_LEN_IN_APP_PART",
                 "range": null,
-                "title": "Encrypt only the app image that is present in the partition of type app",
+                "title": "Encrypt contents upto app image length in app partition",
                 "type": "bool"
             },
             {
@@ -14736,6 +14736,26 @@
                                                 "type": "int"
                                             },
                                             {
+                                                "children": [],
+                                                "depends_on": "BT_CONTROLLER_ENABLED && SOC_ESP_NIMBLE_CONTROLLER && BLE_LOG_ENABLED",
+                                                "help": "Current BLE Controller is ESP BLE Controller",
+                                                "id": "BLE_LOG_IS_ESP_CONTROLLER",
+                                                "name": "BLE_LOG_IS_ESP_CONTROLLER",
+                                                "range": null,
+                                                "title": "Current BLE Controller is ESP BLE Controller",
+                                                "type": "bool"
+                                            },
+                                            {
+                                                "children": [],
+                                                "depends_on": "BT_CONTROLLER_ENABLED && !SOC_ESP_NIMBLE_CONTROLLER && BT_CTRL_RUN_IN_FLASH_ONLY && BLE_LOG_ENABLED",
+                                                "help": "Current BLE Controller is ESP BLE Legacy Controller",
+                                                "id": "BLE_LOG_IS_ESP_LEGACY_CONTROLLER",
+                                                "name": "BLE_LOG_IS_ESP_LEGACY_CONTROLLER",
+                                                "range": null,
+                                                "title": "Current BLE Controller is ESP BLE Legacy Controller",
+                                                "type": "bool"
+                                            },
+                                            {
                                                 "children": [
                                                     {
                                                         "children": [],
@@ -14811,7 +14831,7 @@
                                                     },
                                                     {
                                                         "children": [],
-                                                        "depends_on": "<choice BLE_LOG_PRPH_CHOICE>",
+                                                        "depends_on": "SOC_GPSPI_SUPPORTED && <choice BLE_LOG_PRPH_CHOICE>",
                                                         "help": "Utilize SPI master DMA driver as transport",
                                                         "id": "BLE_LOG_PRPH_SPI_MASTER_DMA",
                                                         "name": "BLE_LOG_PRPH_SPI_MASTER_DMA",
@@ -14821,7 +14841,7 @@
                                                     },
                                                     {
                                                         "children": [],
-                                                        "depends_on": "<choice BLE_LOG_PRPH_CHOICE>",
+                                                        "depends_on": "SOC_UHCI_SUPPORTED && <choice BLE_LOG_PRPH_CHOICE>",
                                                         "help": "Utilize UART DMA driver as transport",
                                                         "id": "BLE_LOG_PRPH_UART_DMA",
                                                         "name": "BLE_LOG_PRPH_UART_DMA",
@@ -14896,6 +14916,1057 @@
                                                 "range": null,
                                                 "title": "GPIO number for UART TX",
                                                 "type": "int"
+                                            },
+                                            {
+                                                "children": [
+                                                    {
+                                                        "children": [
+                                                            {
+                                                                "children": [
+                                                                    {
+                                                                        "children": [],
+                                                                        "depends_on": "BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                        "help": "Maximum output length for a single log",
+                                                                        "id": "BLE_MESH_COMPRESSED_LOG_BUFFER_LEN",
+                                                                        "name": "BLE_MESH_COMPRESSED_LOG_BUFFER_LEN",
+                                                                        "range": null,
+                                                                        "title": "BLE Mesh log buffer length",
+                                                                        "type": "int"
+                                                                    },
+                                                                    {
+                                                                        "children": [
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_MESH_STACK_ERR_LOG_COMPRESSION && BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "When this option is enabled, the log data will be output\nthrough both the compressed log interface and the original\nUART interface at the same time, meaning that the log\nstatements will appear on both paths. However, please note\nthat this dual-output approach introduces additional code\nand string constants, which will increase the size of the\nfirmware binary file. When this option is disabled, the\nlogs will no longer be printed through the original UART\noutput path; instead, they will only be output through the\ncompressed log interface. As the code and strings related\nto the original UART output are omitted, the size of the\nfirmware binary file can be effectively reduced.",
+                                                                                        "id": "BLE_MESH_STACK_ERR_LOG_PRESERVE",
+                                                                                        "name": "BLE_MESH_STACK_ERR_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original error log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The error log in the BLE-MESH component will be compressed",
+                                                                                "id": "BLE_MESH_STACK_ERR_LOG_COMPRESSION",
+                                                                                "name": "BLE_MESH_STACK_ERR_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress ERROR log of ESP-BLE-MESH",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_MESH_STACK_WARN_LOG_COMPRESSION && BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_MESH_STACK_ERR_LOG_PRESERVE",
+                                                                                        "id": "BLE_MESH_STACK_WARN_LOG_PRESERVE",
+                                                                                        "name": "BLE_MESH_STACK_WARN_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original warn log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The warn log in the BLE-MESH component will be compressed",
+                                                                                "id": "BLE_MESH_STACK_WARN_LOG_COMPRESSION",
+                                                                                "name": "BLE_MESH_STACK_WARN_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress warn log of ESP-BLE-MESH",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_MESH_STACK_INFO_LOG_COMPRESSION && BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_MESH_STACK_ERR_LOG_PRESERVE",
+                                                                                        "id": "BLE_MESH_STACK_INFO_LOG_PRESERVE",
+                                                                                        "name": "BLE_MESH_STACK_INFO_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original info log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The info log in the BLE-MESH component will be compressed",
+                                                                                "id": "BLE_MESH_STACK_INFO_LOG_COMPRESSION",
+                                                                                "name": "BLE_MESH_STACK_INFO_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress info log of ESP-BLE-MESH",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_MESH_STACK_DEBUG_LOG_COMPRESSION && BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_MESH_STACK_ERR_LOG_PRESERVE",
+                                                                                        "id": "BLE_MESH_STACK_DEBUG_LOG_PRESERVE",
+                                                                                        "name": "BLE_MESH_STACK_DEBUG_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original debug log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The debug log in the BLE-MESH component will be compressed",
+                                                                                "id": "BLE_MESH_STACK_DEBUG_LOG_COMPRESSION",
+                                                                                "name": "BLE_MESH_STACK_DEBUG_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress debug log of ESP-BLE-MESH",
+                                                                                "type": "bool"
+                                                                            }
+                                                                        ],
+                                                                        "depends_on": "BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                        "id": "component-config-bluetooth-common-options-ble-log-enable-ble-log-module-experimental--settings-of-ble-log-compression-enable-ble-log-compression-preview-please-read-help-information--enable-ble-mesh-log-compression-preview--select-the-stack-log-tag-to-be-compressed",
+                                                                        "title": "Select the stack log tag to be compressed",
+                                                                        "type": "menu"
+                                                                    },
+                                                                    {
+                                                                        "children": [
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_MESH_NET_BUF_ERR_LOG_COMPRESSION && BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "When this option is enabled, the log data will be output\nthrough both the compressed log interface and the original\nUART interface at the same time, meaning that the log\nstatements will appear on both paths. However, please note\nthat this dual-output approach introduces additional code\nand string constants, which will increase the size of the\nfirmware binary file. When this option is disabled, the\nlogs will no longer be printed through the original UART\noutput path; instead, they will only be output through the\ncompressed log interface. As the code and strings related\nto the original UART output are omitted, the size of the\nfirmware binary file can be effectively reduced.",
+                                                                                        "id": "BLE_MESH_NET_BUF_ERR_LOG_PRESERVE",
+                                                                                        "name": "BLE_MESH_NET_BUF_ERR_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original error log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The error log in the BLE-MESH component will be compressed",
+                                                                                "id": "BLE_MESH_NET_BUF_ERR_LOG_COMPRESSION",
+                                                                                "name": "BLE_MESH_NET_BUF_ERR_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress ERROR log of ESP-BLE-MESH",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_MESH_NET_BUF_WARN_LOG_COMPRESSION && BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_MESH_NET_BUF_ERR_LOG_PRESERVE",
+                                                                                        "id": "BLE_MESH_NET_BUF_WARN_LOG_PRESERVE",
+                                                                                        "name": "BLE_MESH_NET_BUF_WARN_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original warn log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The warn log in the BLE-MESH component will be compressed",
+                                                                                "id": "BLE_MESH_NET_BUF_WARN_LOG_COMPRESSION",
+                                                                                "name": "BLE_MESH_NET_BUF_WARN_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress warn log of ESP-BLE-MESH",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_MESH_NET_BUF_INFO_LOG_COMPRESSION && BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_MESH_NET_BUF_ERR_LOG_PRESERVE",
+                                                                                        "id": "BLE_MESH_NET_BUF_INFO_LOG_PRESERVE",
+                                                                                        "name": "BLE_MESH_NET_BUF_INFO_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original info log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The info log in the BLE-MESH component will be compressed",
+                                                                                "id": "BLE_MESH_NET_BUF_INFO_LOG_COMPRESSION",
+                                                                                "name": "BLE_MESH_NET_BUF_INFO_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress info log of ESP-BLE-MESH",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_MESH_NET_BUF_DEBUG_LOG_COMPRESSION && BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_MESH_NET_BUF_ERR_LOG_PRESERVE",
+                                                                                        "id": "BLE_MESH_NET_BUF_DEBUG_LOG_PRESERVE",
+                                                                                        "name": "BLE_MESH_NET_BUF_DEBUG_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original debug log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The debug log in the BLE-MESH component will be compressed",
+                                                                                "id": "BLE_MESH_NET_BUF_DEBUG_LOG_COMPRESSION",
+                                                                                "name": "BLE_MESH_NET_BUF_DEBUG_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress debug log of ESP-BLE-MESH",
+                                                                                "type": "bool"
+                                                                            }
+                                                                        ],
+                                                                        "depends_on": "BLE_MESH_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                        "id": "component-config-bluetooth-common-options-ble-log-enable-ble-log-module-experimental--settings-of-ble-log-compression-enable-ble-log-compression-preview-please-read-help-information--enable-ble-mesh-log-compression-preview--select-the-net-buf-log-tag-to-be-compressed",
+                                                                        "title": "Select the net buf log tag to be compressed",
+                                                                        "type": "menu"
+                                                                    }
+                                                                ],
+                                                                "depends_on": "BLE_COMPRESSED_LOG_ENABLE && BLE_MESH && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                "help": "Apply compression to ESP-BLE-MESH protocol stack logs. Requires\nbase BLE compression to be enabled. Specifically optimizes log\nstorage and transmission for ble mesh.\n\nNote: This library depends on additional Python packages. It will\nfunction correctly only after these dependencies are installed;\nrefer to:\n\"components/bt/common/ble_log/log_compression/README.en.md\"\nfor installation instructions.\n\nIf the required packages are not installed, the log-compression\nmechanism will remain disabled even when this Config is enabled.",
+                                                                "id": "BLE_MESH_COMPRESSED_LOG_ENABLE",
+                                                                "is_menuconfig": true,
+                                                                "name": "BLE_MESH_COMPRESSED_LOG_ENABLE",
+                                                                "range": null,
+                                                                "title": "Enable BLE Mesh log compression(Preview)",
+                                                                "type": "menu"
+                                                            },
+                                                            {
+                                                                "children": [
+                                                                    {
+                                                                        "children": [],
+                                                                        "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                        "help": "Maximum output length for a single log",
+                                                                        "id": "BLE_HOST_COMPRESSED_LOG_BUFFER_LEN",
+                                                                        "name": "BLE_HOST_COMPRESSED_LOG_BUFFER_LEN",
+                                                                        "range": null,
+                                                                        "title": "Host log buffer length",
+                                                                        "type": "int"
+                                                                    },
+                                                                    {
+                                                                        "children": [
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_BTM_ERROR_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "When this option is enabled, the log data will be output\nthrough both the compressed log interface and the original\nUART interface at the same time, meaning that the log\nstatements will appear on both paths. However, please note\nthat this dual-output approach introduces additional code\nand string constants, which will increase the size of the\nfirmware binary file. When this option is disabled, the\nlogs will no longer be printed through the original UART\noutput path; instead, they will only be output through the\ncompressed log interface. As the code and strings related\nto the original UART output are omitted, the size of the\nfirmware binary file can be effectively reduced.",
+                                                                                        "id": "BLE_BLUEDROID_BTM_ERROR_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_BTM_ERROR_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original error log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The error log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_BTM_ERROR_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_BTM_ERROR_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress error log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_BTM_WARNING_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_BTM_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_BTM_WARNING_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_BTM_WARNING_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original warning log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The warning log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_BTM_WARNING_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_BTM_WARNING_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress warning log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_BTM_API_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_BTM_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_BTM_API_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_BTM_API_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original api log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The api log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_BTM_API_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_BTM_API_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress api log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_BTM_EVENT_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_BTM_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_BTM_EVENT_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_BTM_EVENT_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original event log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The event log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_BTM_EVENT_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_BTM_EVENT_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress event log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_BTM_DEBUG_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_BTM_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_BTM_DEBUG_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_BTM_DEBUG_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original debug log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The debug log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_BTM_DEBUG_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_BTM_DEBUG_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress debug log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_BTM_VERBOSE_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_BTM_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_BTM_VERBOSE_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_BTM_VERBOSE_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original verbose log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The verbose log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_BTM_VERBOSE_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_BTM_VERBOSE_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress verbose log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            }
+                                                                        ],
+                                                                        "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                        "id": "component-config-bluetooth-common-options-ble-log-enable-ble-log-module-experimental--settings-of-ble-log-compression-enable-ble-log-compression-preview-please-read-help-information--enable-ble-host-log-compression-preview-only-bluedroid-host-for-now--select-the-btm-layer-log-tag-to-be-compressed",
+                                                                        "title": "Select the BTM layer log tag to be compressed",
+                                                                        "type": "menu"
+                                                                    },
+                                                                    {
+                                                                        "children": [
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_L2CAP_ERROR_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "When this option is enabled, the log data will be output\nthrough both the compressed log interface and the original\nUART interface at the same time, meaning that the log\nstatements will appear on both paths. However, please note\nthat this dual-output approach introduces additional code\nand string constants, which will increase the size of the\nfirmware binary file. When this option is disabled, the\nlogs will no longer be printed through the original UART\noutput path; instead, they will only be output through the\ncompressed log interface. As the code and strings related\nto the original UART output are omitted, the size of the\nfirmware binary file can be effectively reduced.",
+                                                                                        "id": "BLE_BLUEDROID_L2CAP_ERROR_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_L2CAP_ERROR_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original error log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The error log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_L2CAP_ERROR_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_L2CAP_ERROR_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress error log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_L2CAP_WARNING_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_L2CAP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_L2CAP_WARNING_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_L2CAP_WARNING_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original warning log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The warning log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_L2CAP_WARNING_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_L2CAP_WARNING_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress warning log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_L2CAP_API_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_L2CAP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_L2CAP_API_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_L2CAP_API_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original api log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The api log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_L2CAP_API_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_L2CAP_API_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress api log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_L2CAP_EVENT_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_L2CAP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_L2CAP_EVENT_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_L2CAP_EVENT_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original event log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The event log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_L2CAP_EVENT_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_L2CAP_EVENT_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress event log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_L2CAP_DEBUG_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_L2CAP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_L2CAP_DEBUG_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_L2CAP_DEBUG_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original debug log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The debug log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_L2CAP_DEBUG_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_L2CAP_DEBUG_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress debug log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_L2CAP_VERBOSE_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_L2CAP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_L2CAP_VERBOSE_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_L2CAP_VERBOSE_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original verbose log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The verbose log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_L2CAP_VERBOSE_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_L2CAP_VERBOSE_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress verbose log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            }
+                                                                        ],
+                                                                        "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                        "id": "component-config-bluetooth-common-options-ble-log-enable-ble-log-module-experimental--settings-of-ble-log-compression-enable-ble-log-compression-preview-please-read-help-information--enable-ble-host-log-compression-preview-only-bluedroid-host-for-now--select-the-la2cap-layer-log-tag-to-be-compressed",
+                                                                        "title": "Select the LA2CAP layer log tag to be compressed",
+                                                                        "type": "menu"
+                                                                    },
+                                                                    {
+                                                                        "children": [
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_GAP_ERROR_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "When this option is enabled, the log data will be output\nthrough both the compressed log interface and the original\nUART interface at the same time, meaning that the log\nstatements will appear on both paths. However, please note\nthat this dual-output approach introduces additional code\nand string constants, which will increase the size of the\nfirmware binary file. When this option is disabled, the\nlogs will no longer be printed through the original UART\noutput path; instead, they will only be output through the\ncompressed log interface. As the code and strings related\nto the original UART output are omitted, the size of the\nfirmware binary file can be effectively reduced.",
+                                                                                        "id": "BLE_BLUEDROID_GAP_ERROR_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_GAP_ERROR_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original error log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The error log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_GAP_ERROR_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_GAP_ERROR_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress error log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_GAP_WARNING_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_GAP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_GAP_WARNING_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_GAP_WARNING_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original warning log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The warning log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_GAP_WARNING_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_GAP_WARNING_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress warning log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_GAP_API_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_GAP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_GAP_API_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_GAP_API_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original api log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The api log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_GAP_API_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_GAP_API_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress api log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_GAP_EVENT_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_GAP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_GAP_EVENT_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_GAP_EVENT_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original event log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The event log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_GAP_EVENT_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_GAP_EVENT_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress event log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_GAP_DEBUG_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_GAP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_GAP_DEBUG_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_GAP_DEBUG_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original debug log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The debug log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_GAP_DEBUG_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_GAP_DEBUG_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress debug log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_GAP_VERBOSE_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_GAP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_GAP_VERBOSE_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_GAP_VERBOSE_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original verbose log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The verbose log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_GAP_VERBOSE_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_GAP_VERBOSE_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress verbose log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            }
+                                                                        ],
+                                                                        "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                        "id": "component-config-bluetooth-common-options-ble-log-enable-ble-log-module-experimental--settings-of-ble-log-compression-enable-ble-log-compression-preview-please-read-help-information--enable-ble-host-log-compression-preview-only-bluedroid-host-for-now--select-the-gap-layer-log-tag-to-be-compressed",
+                                                                        "title": "Select the GAP layer log tag to be compressed",
+                                                                        "type": "menu"
+                                                                    },
+                                                                    {
+                                                                        "children": [
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_GATT_ERROR_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "When this option is enabled, the log data will be output\nthrough both the compressed log interface and the original\nUART interface at the same time, meaning that the log\nstatements will appear on both paths. However, please note\nthat this dual-output approach introduces additional code\nand string constants, which will increase the size of the\nfirmware binary file. When this option is disabled, the\nlogs will no longer be printed through the original UART\noutput path; instead, they will only be output through the\ncompressed log interface. As the code and strings related\nto the original UART output are omitted, the size of the\nfirmware binary file can be effectively reduced.",
+                                                                                        "id": "BLE_BLUEDROID_GATT_ERROR_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_GATT_ERROR_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original error log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The error log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_GATT_ERROR_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_GATT_ERROR_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress error log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_GATT_WARNING_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_GATT_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_GATT_WARNING_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_GATT_WARNING_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original warning log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The warning log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_GATT_WARNING_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_GATT_WARNING_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress warning log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_GATT_API_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_GATT_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_GATT_API_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_GATT_API_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original api log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The api log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_GATT_API_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_GATT_API_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress api log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_GATT_EVENT_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_GATT_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_GATT_EVENT_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_GATT_EVENT_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original event log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The event log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_GATT_EVENT_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_GATT_EVENT_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress event log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_GATT_DEBUG_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_GATT_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_GATT_DEBUG_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_GATT_DEBUG_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original debug log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The debug log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_GATT_DEBUG_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_GATT_DEBUG_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress debug log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_GATT_VERBOSE_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_GATT_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_GATT_VERBOSE_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_GATT_VERBOSE_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original verbose log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The verbose log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_GATT_VERBOSE_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_GATT_VERBOSE_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress verbose log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            }
+                                                                        ],
+                                                                        "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                        "id": "component-config-bluetooth-common-options-ble-log-enable-ble-log-module-experimental--settings-of-ble-log-compression-enable-ble-log-compression-preview-please-read-help-information--enable-ble-host-log-compression-preview-only-bluedroid-host-for-now--select-the-gatt-layer-log-tag-to-be-compressed",
+                                                                        "title": "Select the GATT layer log tag to be compressed",
+                                                                        "type": "menu"
+                                                                    },
+                                                                    {
+                                                                        "children": [
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_SMP_ERROR_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "When this option is enabled, the log data will be output\nthrough both the compressed log interface and the original\nUART interface at the same time, meaning that the log\nstatements will appear on both paths. However, please note\nthat this dual-output approach introduces additional code\nand string constants, which will increase the size of the\nfirmware binary file. When this option is disabled, the\nlogs will no longer be printed through the original UART\noutput path; instead, they will only be output through the\ncompressed log interface. As the code and strings related\nto the original UART output are omitted, the size of the\nfirmware binary file can be effectively reduced.",
+                                                                                        "id": "BLE_BLUEDROID_SMP_ERROR_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_SMP_ERROR_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original error log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The error log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_SMP_ERROR_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_SMP_ERROR_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress error log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_SMP_WARNING_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_SMP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_SMP_WARNING_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_SMP_WARNING_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original warning log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The warning log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_SMP_WARNING_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_SMP_WARNING_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress warning log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_SMP_API_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_SMP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_SMP_API_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_SMP_API_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original api log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The api log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_SMP_API_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_SMP_API_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress api log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_SMP_EVENT_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_SMP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_SMP_EVENT_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_SMP_EVENT_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original event log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The event log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_SMP_EVENT_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_SMP_EVENT_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress event log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_SMP_DEBUG_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_SMP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_SMP_DEBUG_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_SMP_DEBUG_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original debug log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The debug log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_SMP_DEBUG_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_SMP_DEBUG_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress debug log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_SMP_VERBOSE_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_SMP_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_SMP_VERBOSE_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_SMP_VERBOSE_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original verbose log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The verbose log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_SMP_VERBOSE_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_SMP_VERBOSE_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress verbose log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            }
+                                                                        ],
+                                                                        "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                        "id": "component-config-bluetooth-common-options-ble-log-enable-ble-log-module-experimental--settings-of-ble-log-compression-enable-ble-log-compression-preview-please-read-help-information--enable-ble-host-log-compression-preview-only-bluedroid-host-for-now--select-the-smp-layer-log-tag-to-be-compressed",
+                                                                        "title": "Select the SMP layer log tag to be compressed",
+                                                                        "type": "menu"
+                                                                    },
+                                                                    {
+                                                                        "children": [
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_APPL_ERROR_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "When this option is enabled, the log data will be output\nthrough both the compressed log interface and the original\nUART interface at the same time, meaning that the log\nstatements will appear on both paths. However, please note\nthat this dual-output approach introduces additional code\nand string constants, which will increase the size of the\nfirmware binary file. When this option is disabled, the\nlogs will no longer be printed through the original UART\noutput path; instead, they will only be output through the\ncompressed log interface. As the code and strings related\nto the original UART output are omitted, the size of the\nfirmware binary file can be effectively reduced.",
+                                                                                        "id": "BLE_BLUEDROID_APPL_ERROR_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_APPL_ERROR_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original error log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The error log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_APPL_ERROR_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_APPL_ERROR_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress error log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_APPL_WARNING_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_APPL_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_APPL_WARNING_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_APPL_WARNING_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original warning log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The warning log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_APPL_WARNING_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_APPL_WARNING_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress warning log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_APPL_API_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_APPL_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_APPL_API_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_APPL_API_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original api log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The api log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_APPL_API_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_APPL_API_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress api log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_APPL_EVENT_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_APPL_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_APPL_EVENT_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_APPL_EVENT_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original event log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The event log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_APPL_EVENT_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_APPL_EVENT_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress event log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_APPL_DEBUG_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_APPL_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_APPL_DEBUG_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_APPL_DEBUG_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original debug log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The debug log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_APPL_DEBUG_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_APPL_DEBUG_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress debug log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            },
+                                                                            {
+                                                                                "children": [
+                                                                                    {
+                                                                                        "children": [],
+                                                                                        "depends_on": "BLE_BLUEDROID_APPL_VERBOSE_LOG_COMPRESSION && BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                        "help": "Please refer to the help information in BLE_BLUEDROID_APPL_ERROR_LOG_PRESERVE",
+                                                                                        "id": "BLE_BLUEDROID_APPL_VERBOSE_LOG_PRESERVE",
+                                                                                        "name": "BLE_BLUEDROID_APPL_VERBOSE_LOG_PRESERVE",
+                                                                                        "range": null,
+                                                                                        "title": "Keep the original verbose log statement",
+                                                                                        "type": "bool"
+                                                                                    }
+                                                                                ],
+                                                                                "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                                "help": "The verbose log in the  Bluedroid host component will be compressed",
+                                                                                "id": "BLE_BLUEDROID_APPL_VERBOSE_LOG_COMPRESSION",
+                                                                                "name": "BLE_BLUEDROID_APPL_VERBOSE_LOG_COMPRESSION",
+                                                                                "range": null,
+                                                                                "title": "Compress verbose log of Bluedroid host",
+                                                                                "type": "bool"
+                                                                            }
+                                                                        ],
+                                                                        "depends_on": "BLE_HOST_COMPRESSED_LOG_ENABLE && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                        "id": "component-config-bluetooth-common-options-ble-log-enable-ble-log-module-experimental--settings-of-ble-log-compression-enable-ble-log-compression-preview-please-read-help-information--enable-ble-host-log-compression-preview-only-bluedroid-host-for-now--select-the-appl-layer-log-tag-to-be-compressed",
+                                                                        "title": "Select the APPL layer log tag to be compressed",
+                                                                        "type": "menu"
+                                                                    }
+                                                                ],
+                                                                "depends_on": "BLE_COMPRESSED_LOG_ENABLE && BT_BLUEDROID_ENABLED && BLE_COMPRESSED_LOG_ENABLE && BLE_LOG_ENABLED",
+                                                                "help": "Apply compression to host logs. Requires\nbase BLE compression to be enabled. Specifically optimizes log\nstorage and transmission.\n\nNote: This library depends on additional Python packages. It will\nfunction correctly only after these dependencies are installed;\nrefer to:\n\"components/bt/common/ble_log/log_compression/README.en.md\"\nfor installation instructions.",
+                                                                "id": "BLE_HOST_COMPRESSED_LOG_ENABLE",
+                                                                "is_menuconfig": true,
+                                                                "name": "BLE_HOST_COMPRESSED_LOG_ENABLE",
+                                                                "range": null,
+                                                                "title": "Enable BLE Host log compression(Preview, only Bluedroid Host for now)",
+                                                                "type": "menu"
+                                                            }
+                                                        ],
+                                                        "depends_on": "BLE_LOG_ENABLED",
+                                                        "help": "Compress BLE logs during application build to reduce flash usage\nand improve output speed. When enabled, log data from Bluetooth\nLow Energy components will be compressed before storage,\noptimizing both memory footprint and transmission efficiency.\n\nNote: This library depends on additional Python packages. It will\nfunction correctly only after these dependencies are installed;\nrefer to:\n\"components/bt/common/ble_log/log_compression/README.en.md\"\nfor installation instructions.",
+                                                        "id": "BLE_COMPRESSED_LOG_ENABLE",
+                                                        "name": "BLE_COMPRESSED_LOG_ENABLE",
+                                                        "range": null,
+                                                        "title": "Enable BLE log compression(Preview, Please read help information)",
+                                                        "type": "bool"
+                                                    }
+                                                ],
+                                                "depends_on": "BLE_LOG_ENABLED",
+                                                "id": "component-config-bluetooth-common-options-ble-log-enable-ble-log-module-experimental--settings-of-ble-log-compression",
+                                                "title": "Settings of BLE Log Compression",
+                                                "type": "menu"
                                             }
                                         ],
                                         "depends_on": null,
@@ -22220,7 +23291,10 @@
                                         "help": "If malloc() is capable of also allocating SPI-connected ram, its allocation strategy will prefer to\nallocate chunks less than this size in internal memory, while allocations larger than this will be\ndone from external RAM. If allocation from the preferred region fails, an attempt is made to allocate\nfrom the non-preferred region instead, so malloc() will not suddenly fail when either internal or\nexternal memory is full.",
                                         "id": "SPIRAM_MALLOC_ALWAYSINTERNAL",
                                         "name": "SPIRAM_MALLOC_ALWAYSINTERNAL",
-                                        "range": null,
+                                        "range": [
+                                            0,
+                                            131072
+                                        ],
                                         "title": "Maximum malloc() size, in bytes, to always put in internal memory",
                                         "type": "int"
                                     },
@@ -22240,7 +23314,10 @@
                                         "help": "Because the external/internal RAM allocation strategy is not always perfect, it sometimes may happen\nthat the internal memory is entirely filled up. This causes allocations that are specifically done in\ninternal memory, for example the stack for new tasks or memory to service DMA or have memory that's\nalso available when SPI cache is down, to fail. This option reserves a pool specifically for requests\nlike that; the memory in this pool is not given out when a normal malloc() is called.\n\nSet this to 0 to disable this feature.\n\nNote that because FreeRTOS stacks are forced to internal memory, they will also use this memory pool;\nbe sure to keep this in mind when adjusting this value.\n\nNote also that the DMA reserved pool may not be one single contiguous memory region, depending on the\nconfigured size and the static memory usage of the app.",
                                         "id": "SPIRAM_MALLOC_RESERVE_INTERNAL",
                                         "name": "SPIRAM_MALLOC_RESERVE_INTERNAL",
-                                        "range": null,
+                                        "range": [
+                                            0,
+                                            262144
+                                        ],
                                         "title": "Reserve this amount of bytes for data that specifically needs to be in DMA or internal memory",
                                         "type": "int"
                                     },
@@ -24356,7 +25433,7 @@
                     },
                     {
                         "children": [],
-                        "depends_on": "SOC_WIFI_GCMP_SUPPORT && (ESP_WIFI_ENABLED || ESP_HOST_WIFI_ENABLED)",
+                        "depends_on": "ESP_WIFI_ENTERPRISE_SUPPORT && SOC_WIFI_GCMP_SUPPORT && (ESP_WIFI_ENABLED || ESP_HOST_WIFI_ENABLED)",
                         "help": "Select this option to enable 192 bit NSA suite-B.\nThis is necessary to support WPA3 192 bit security.",
                         "id": "ESP_WIFI_SUITE_B_192",
                         "name": "ESP_WIFI_SUITE_B_192",
@@ -28857,6 +29934,27 @@
                         "range": null,
                         "title": "Max number of entries in IPv6 destinations cache",
                         "type": "int"
+                    },
+                    {
+                        "children": [
+                            {
+                                "children": [],
+                                "depends_on": "LWIP_IPV6_ND6_ROUTE_INFO_OPTION_SUPPORT",
+                                "help": "Maximum number of entries in IPv6 route information options cache",
+                                "id": "LWIP_IPV6_ND6_NUM_ROUTE_INFO",
+                                "name": "LWIP_IPV6_ND6_NUM_ROUTE_INFO",
+                                "range": null,
+                                "title": "Max number of entries in IPv6 route information options cache",
+                                "type": "int"
+                            }
+                        ],
+                        "depends_on": "LWIP_ND6",
+                        "help": "Enable route information option (RIO) support in IPV6 ND6",
+                        "id": "LWIP_IPV6_ND6_ROUTE_INFO_OPTION_SUPPORT",
+                        "name": "LWIP_IPV6_ND6_ROUTE_INFO_OPTION_SUPPORT",
+                        "range": null,
+                        "title": "Enable IPV6 ND6 route information option support",
+                        "type": "bool"
                     },
                     {
                         "children": [

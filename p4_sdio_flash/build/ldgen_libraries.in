@@ -38,6 +38,7 @@ $<TARGET_FILE:__idf_esp_app_format>
 $<TARGET_FILE:__idf_esp_bootloader_format>
 $<TARGET_FILE:idf::esp_mm>
 $<TARGET_FILE:idf::bootloader_support>
+$<TARGET_FILE:__idf_esp_psram>
 $<TARGET_FILE:__idf_esp_gdbstub>
 $<TARGET_FILE:__idf_driver>
 $<TARGET_FILE:__idf_esp_driver_pcnt>
@@ -131,6 +132,7 @@ $<TARGET_FILE:idf::esp_adc>
 $<TARGET_FILE:idf::esp_driver_isp>
 $<TARGET_FILE:idf::esp_driver_cam>
 $<TARGET_FILE:__idf_esp_driver_isp>
+$<TARGET_FILE:idf::esp_psram>
 $<TARGET_FILE:idf::esp_driver_jpeg>
 $<TARGET_FILE:idf::esp_driver_ppa>
 $<TARGET_FILE:idf::esp_driver_touch_sens>

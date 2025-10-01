@@ -34,6 +34,8 @@ void slave_monitor(void *arg)
                                  UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM_2, BUF_LEN * 4, BUF_LEN * 4, 0, NULL, 0));
 
+    ESP_LOGI(TAG, "UART2 monitor ready (GPIO35=TX, GPIO36=RX)");
+
     while (1) {
         int rx = uart_read_bytes(UART_NUM_2, buf, BUF_LEN - 1, 100 / portTICK_PERIOD_MS);
         if (rx > 0) { buf[rx] = '\0'; printf("%s", buf); }

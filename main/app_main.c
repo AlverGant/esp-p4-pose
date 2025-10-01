@@ -276,22 +276,39 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
-    // Start co-processor SDIO communication with C6
+    // Start co-processor UART communication with C6
 #if CONFIG_COPROC_UART_ENABLE
     // Always initialize UART for fallback communication
     ESP_LOGI(TAG, "Initializing UART communication with C6...");
-    (void)coproc_uart_init();
-    (void)coproc_uart_start_rx_log();
+    esp_err_t uart_init_ret = coproc_uart_init();
+    if (uart_init_ret == ESP_OK) {
+        ESP_LOGI(TAG, "UART init successful, starting RX log task");
+        (void)coproc_uart_start_rx_log();
 
-    // Also try SDIO (but use UART as primary for now due to SDIO issues)
-    ESP_LOGI(TAG, "Attempting SDIO communication with C6...");
-    esp_err_t sdio_ret = coproc_sdio_init();
-    if (sdio_ret == ESP_OK) {
-        (void)coproc_sdio_start_rx_log();
-        ESP_LOGI(TAG, "SDIO communication initialized (UART remains active)");
+        // Test UART communication immediately after init
+        ESP_LOGI(TAG, "Testing UART TX to C6...");
+        vTaskDelay(pdMS_TO_TICKS(500));  // Wait for C6 to be ready
+        for (int i = 0; i < 3; i++) {
+            char test_msg[64];
+            snprintf(test_msg, sizeof(test_msg), "P4: UART test message #%d", i+1);
+            esp_err_t send_ret = coproc_uart_send_line(test_msg);
+            ESP_LOGI(TAG, "Test message %d send result: %s", i+1, esp_err_to_name(send_ret));
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
+        ESP_LOGI(TAG, "UART test complete - check C6 logs for received messages");
     } else {
-        ESP_LOGW(TAG, "SDIO init failed, using UART only");
+        ESP_LOGE(TAG, "UART init failed: %s", esp_err_to_name(uart_init_ret));
     }
+
+    // SDIO DISABLED: Interferes with UART communication (resets C6 during init)
+    ESP_LOGI(TAG, "SDIO disabled - using UART only for C6 communication");
+    // esp_err_t sdio_ret = coproc_sdio_init();
+    // if (sdio_ret == ESP_OK) {
+    //     (void)coproc_sdio_start_rx_log();
+    //     ESP_LOGI(TAG, "SDIO communication initialized (UART remains active)");
+    // } else {
+    //     ESP_LOGW(TAG, "SDIO init failed, using UART only");
+    // }
 #endif
 
 #if CONFIG_COPROC_LOG_TEST_ONLY

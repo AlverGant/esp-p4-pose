@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "c6_messenger",
-    "project_version":    "09afcf5-dirty",
+    "project_version":    "80e5744-dirty",
     "project_path":       "/home/alvaro/Downloads/esp-p4-pose/c6_messenger",
     "idf_path":           "/home/alvaro/Downloads/esp-idf",
     "build_dir":          "/home/alvaro/Downloads/esp-p4-pose/c6_messenger/build",
@@ -11,7 +11,7 @@
     "app_elf":            "c6_messenger.elf",
     "app_bin":            "c6_messenger.bin",
     "build_type":         "flash_app",
-    "git_revision":       "v5.5.1-144-g4b2b5d7baf",
+    "git_revision":       "v5.5.1-255-g07e9bf4970",
     "target":             "esp32c6",
     "rev":                "",
     "min_rev":            "0",
@@ -655,7 +655,7 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "/home/alvaro/Downloads/esp-p4-pose/c6_messenger/build/esp-idf/esp_driver_usb_serial_jtag/libesp_driver_usb_serial_jtag.a",
-            "sources": [ "/home/alvaro/Downloads/esp-idf/components/esp_driver_usb_serial_jtag/src/usb_serial_jtag.c", "/home/alvaro/Downloads/esp-idf/components/esp_driver_usb_serial_jtag/src/usb_serial_jtag_connection_monitor.c", "/home/alvaro/Downloads/esp-idf/components/esp_driver_usb_serial_jtag/src/usb_serial_jtag_vfs.c" ],
+            "sources": [ "/home/alvaro/Downloads/esp-idf/components/esp_driver_usb_serial_jtag/src/usb_serial_jtag.c", "/home/alvaro/Downloads/esp-idf/components/esp_driver_usb_serial_jtag/src/usb_serial_jtag_connection_monitor.c" ],
             "include_dirs": [ "include" ]
         },
         "esp_eth": {
@@ -1240,7 +1240,7 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "/home/alvaro/Downloads/esp-p4-pose/c6_messenger/build/esp-idf/main/libmain.a",
-            "sources": [ "/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/main.c", "/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/coproc_sdio_slave.c" ],
+            "sources": [ "/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/main.c", "/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/coproc_sdio_slave.c", "/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/hosted_alert_server.c" ],
             "include_dirs": [ "." ]
         },
         "mbedtls": {

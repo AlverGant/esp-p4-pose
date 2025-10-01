@@ -43,23 +43,16 @@ MEMORY
    */
   /* TCM */
   tcm_idram_seg (RX) : org = 0x30100000, len = 0x2000
-  /* Flash mapped instruction data */
-  irom_seg (RX) : org = 0x40000020, len = (0x10000 << 10) - 0x20
-  /**
-   * (0x20 offset above is a convenience for the app binary image generation.
-   * Flash cache has 64KB pages. The .bin file which is flashed to the chip
-   * has a 0x18 byte file header, and each segment has a 0x08 byte segment
-   * header. Setting this offset makes it simple to meet the flash cache MMU's
-   * constraint that (paddr % 64KB == vaddr % 64KB).)
-   */
+  /* PSRAM mapped instruction data */
+  irom_seg (RX) : org = 0x48000020, len = (0x10000 << 10) - 0x20
   /**
    * Shared data RAM, excluding memory reserved for ROM bss/data/stack.
    * Enabling Bluetooth & Trace Memory features in menuconfig will decrease the amount of RAM available.
    */
   sram_low (RWX) : org = 0x4FF00000, len = 0x4FF2CBD0 - 0x4FF00000
-  sram_high (RW) : org = 0x4FF40000, len = 0x80000 - 0x20000
-  /* Flash mapped constant data */
-  drom_seg (R) : org = 0x40000020, len = (0x10000 << 10) - 0x20
+  sram_high (RW) : org = 0x4FF40000, len = 0x80000 - 0x40000
+  /* PSRAM mapped constant data */
+  drom_seg (R) : org = 0x48000020, len = (0x10000 << 10) - 0x20
   /* (See irom_seg for meaning of 0x20 offset in the above.) */
   /**
    * lp ram memory (RWX). Persists over deep sleep. // TODO: IDF-5667
@@ -92,7 +85,7 @@ REGION_ALIAS("rtc_data_location", rtc_iram_seg );
 REGION_ALIAS("rtc_reserved_seg", lp_reserved_seg );
   REGION_ALIAS("text_seg_low", irom_seg);
   REGION_ALIAS("rodata_seg_low", drom_seg);
-  REGION_ALIAS("ext_ram_seg", extern_ram_seg);
+  REGION_ALIAS("ext_ram_seg", drom_seg);
 /**
  *  If rodata default segment is placed in `drom_seg`, then flash's first rodata section must
  *  also be first in the segment.

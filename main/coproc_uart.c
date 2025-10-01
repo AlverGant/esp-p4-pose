@@ -18,10 +18,10 @@ typedef struct {
     bool inited;
 } uart_candidate_t;
 
-// Note: add UART0 as a third candidate with NO_CHANGE pins (use default mux)
+// Note: UART2 (GPIO35/36) connects to C6 UART0 (GPIO17/16)
 static uart_candidate_t s_candidates[] = {
-    { UART_NUM_1, 35, 36, "u1", NULL, false },
-    { UART_NUM_2, 45, 46, "u2", NULL, false },
+    { UART_NUM_2, 35, 36, "u2", NULL, false },  // P4 GPIO35(TX)→C6 GPIO17(RX), P4 GPIO36(RX)→C6 GPIO16(TX)
+    { UART_NUM_1, 45, 46, "u1", NULL, false },
     { UART_NUM_0, -1, -1, "u0", NULL, false },
 };
 
@@ -33,9 +33,22 @@ static void coproc_uart_rx_task(void *arg)
     uint8_t ch;
     char line[256];
     size_t n = 0;
+    int heartbeat = 0;
+    int total_bytes = 0;
+
+    ESP_LOGI(TAG_UART, "UART RX task started on port %d (%s)", port, cand ? cand->name : "main");
+
     for (;;) {
         int r = uart_read_bytes(port, &ch, 1, pdMS_TO_TICKS(100));
+
+        // Heartbeat a cada 10 segundos
+        if (++heartbeat >= 100) {  // 100 * 100ms = 10s
+            ESP_LOGI(TAG_UART, "UART%d RX alive (total_bytes=%d, buf=%d)", port, total_bytes, n);
+            heartbeat = 0;
+        }
+
         if (r == 1) {
+            total_bytes++;
             if (ch == '\n' || ch == '\r') {
                 if (n > 0) {
                     line[n] = 0;
@@ -88,16 +101,30 @@ esp_err_t coproc_uart_init(void)
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT,
     };
+
+    ESP_LOGI(TAG_UART, "Configuring UART%d with baud=%d", port, CONFIG_COPROC_UART_BAUD);
     ESP_ERROR_CHECK(uart_param_config(port, &cfg));
+
+    // CRITICAL: Explicitly set pins (don't rely on defaults)
+    ESP_LOGI(TAG_UART, "Setting UART%d pins: TX=%d, RX=%d", port, tx_pin, rx_pin);
     ESP_ERROR_CHECK(uart_set_pin(port, tx_pin,
                                  (rx_pin >= 0 ? rx_pin : UART_PIN_NO_CHANGE),
                                  UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-    // RX buffer for C6 logs; TX buffer 0 (blocking write)
+
+    // Large RX buffer for C6 logs to prevent blocking; TX buffer for sends
     if (!uart_is_driver_installed(port)) {
-        ESP_ERROR_CHECK(uart_driver_install(port, 1024, 0, 0, NULL, 0));
+        ESP_LOGI(TAG_UART, "Installing UART%d driver with RX=4096, TX=2048", port);
+        ESP_ERROR_CHECK(uart_driver_install(port, 4096, 2048, 0, NULL, 0));
+    } else {
+        ESP_LOGI(TAG_UART, "UART%d driver already installed", port);
     }
+
+    // Clear any garbage in RX buffer
+    uart_flush_input(port);
+
     s_uart_inited = true;
-    ESP_LOGI(TAG_UART, "UART%d ready TX=%d RX=%d @%d", port, tx_pin, rx_pin, CONFIG_COPROC_UART_BAUD);
+    ESP_LOGI(TAG_UART, "UART%d ready: TX=GPIO%d, RX=GPIO%d, baud=%d",
+             port, tx_pin, rx_pin, CONFIG_COPROC_UART_BAUD);
     return ESP_OK;
 #endif
 }
@@ -117,16 +144,35 @@ esp_err_t coproc_uart_send_line(const char *line)
         return ESP_ERR_INVALID_STATE;
     }
 
+    // CRITICAL FIX: Flush RX buffer before sending to prevent interference
+    size_t rx_bytes = 0;
+    uart_get_buffered_data_len(port, &rx_bytes);
+    if (rx_bytes > 0) {
+        ESP_LOGD(TAG_UART, "Flushing %d bytes from RX buffer before send", (int)rx_bytes);
+        uart_flush_input(port);
+    }
+
     // Compose with newline
     char buf[256];
     size_t n = strnlen(line, sizeof(buf) - 2);
     memcpy(buf, line, n);
     buf[n++] = '\n';
+
+    // CRITICAL FIX: Flush TX FIFO before writing new data
+    uart_wait_tx_done(port, pdMS_TO_TICKS(100));
+
     // blocking write
     ESP_LOGI(TAG_UART, "Sending %d bytes to UART%d: '%.*s'", (int)n, port, (int)(n-1), buf);
     int w = uart_write_bytes(port, buf, n);
-    ESP_LOGI(TAG_UART, "UART%d write result: %d/%d bytes", port, w, (int)n);
-    if (w == (int)n) return ESP_OK;
+    ESP_LOGI(TAG_UART, "uart_write_bytes returned: %d (expected %d)", w, (int)n);
+
+    if (w == (int)n) {
+        // Wait for TX to complete (ensures bytes are actually transmitted)
+        esp_err_t wait_ret = uart_wait_tx_done(port, pdMS_TO_TICKS(1000));
+        ESP_LOGI(TAG_UART, "UART%d TX completed: %d bytes (wait_ret=%s)", port, w, esp_err_to_name(wait_ret));
+        return ESP_OK;
+    }
+    ESP_LOGW(TAG_UART, "UART%d write incomplete: %d/%d bytes", port, w, (int)n);
     int ok = 0;
     for (unsigned i = 0; i < sizeof(s_candidates)/sizeof(s_candidates[0]); ++i) {
         if (s_candidates[i].inited) {
@@ -177,7 +223,7 @@ esp_err_t coproc_uart_probe_and_start_rx_log(void)
             uart_set_pin(c->port, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
         }
         if (!uart_is_driver_installed(c->port)) {
-            uart_driver_install(c->port, 1024, 0, 0, NULL, 0);
+            uart_driver_install(c->port, 4096, 2048, 0, NULL, 0);
         }
         c->inited = true;
         BaseType_t ok = xTaskCreatePinnedToCore(coproc_uart_rx_task, c->name, 3072, (void*)c, 2, &c->rx_task, 0);
@@ -212,7 +258,7 @@ esp_err_t coproc_uart_force_uart2_log(void)
     uart_param_config(c->port, &cfg);
     uart_set_pin(c->port, c->tx_pin, c->rx_pin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     if (!uart_is_driver_installed(c->port)) {
-        uart_driver_install(c->port, 1024, 0, 0, NULL, 0);
+        uart_driver_install(c->port, 4096, 2048, 0, NULL, 0);
     }
     c->inited = true;
     s_active_port = c->port;

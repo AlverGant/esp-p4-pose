@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "p4_sdio_flash",
-    "project_version":    "09afcf5-dirty",
+    "project_version":    "80e5744-dirty",
     "project_path":       "/home/alvaro/Downloads/esp-p4-pose/p4_sdio_flash",
     "idf_path":           "/home/alvaro/Downloads/esp-idf",
     "build_dir":          "/home/alvaro/Downloads/esp-p4-pose/p4_sdio_flash/build",
@@ -11,7 +11,7 @@
     "app_elf":            "p4_sdio_flash.elf",
     "app_bin":            "p4_sdio_flash.bin",
     "build_type":         "flash_app",
-    "git_revision":       "v5.5.1-144-g4b2b5d7baf",
+    "git_revision":       "v5.5.1-255-g07e9bf4970",
     "target":             "esp32p4",
     "rev":                "",
     "min_rev":            "1",
@@ -933,14 +933,14 @@
             "target": "___idf_esp_psram",
             "prefix": "idf",
             "dir": "/home/alvaro/Downloads/esp-idf/components/esp_psram",
-            "type": "CONFIG_ONLY",
+            "type": "LIBRARY",
             "lib": "__idf_esp_psram",
             "reqs": [],
             "priv_reqs": [ "heap", "spi_flash", "esp_mm" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
-            "file": "",
-            "sources": [],
+            "file": "/home/alvaro/Downloads/esp-p4-pose/p4_sdio_flash/build/esp-idf/esp_psram/libesp_psram.a",
+            "sources": [ "/home/alvaro/Downloads/esp-idf/components/esp_psram/system_layer/esp_psram.c", "/home/alvaro/Downloads/esp-idf/components/esp_psram/device/esp_psram_impl_ap_hex.c", "/home/alvaro/Downloads/esp-idf/components/esp_psram/xip_impl/mmu_psram_flash_v2.c" ],
             "include_dirs": [ "include", "xip_impl/include" ]
         },
         "esp_ringbuf": {
@@ -1496,7 +1496,7 @@
             "managed_priv_reqs": [],
             "file": "/home/alvaro/Downloads/esp-p4-pose/p4_sdio_flash/build/esp-idf/soc/libsoc.a",
             "sources": [ "/home/alvaro/Downloads/esp-idf/components/soc/lldesc.c", "/home/alvaro/Downloads/esp-idf/components/soc/dport_access_common.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/interrupts.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/gpio_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/uart_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/adc_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/ana_cmpr_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/dedic_gpio_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/debug_probe_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/emac_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/etm_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/gdma_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/dma2d_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/spi_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/ledc_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/pcnt_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/rmt_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/sdm_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/isp_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/i2s_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/i2c_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/i3c_master_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/temperature_sensor_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/timer_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/lcd_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/mipi_dsi_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/mipi_csi_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/parlio_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/mcpwm_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/mpi_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/sdmmc_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/touch_sensor_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/twai_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/wdt_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/usb_dwc_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/rtc_io_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/system_retention_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/cam_periph.c", "/home/alvaro/Downloads/esp-idf/components/soc/esp32p4/power_supply_periph.c" ],
-            "include_dirs": [ "include", "esp32p4", "esp32p4/include", "esp32p4/register" ]
+            "include_dirs": [ "include", "esp32p4", "esp32p4/include", "esp32p4/register/hw_ver1" ]
         },
         "spi_flash": {
             "alias": "idf::spi_flash",
@@ -2800,7 +2800,7 @@
             "priv_reqs": [],
             "managed_reqs": [],
             "managed_priv_reqs": [],
-            "include_dirs": [ "include", "esp32p4", "esp32p4/include", "esp32p4/register" ]
+            "include_dirs": [ "include", "esp32p4", "esp32p4/include", "esp32p4/register/hw_ver1" ]
         },
         "spi_flash": {
             "alias": "idf::spi_flash",
