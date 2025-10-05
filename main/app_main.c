@@ -10,7 +10,10 @@
 #include "esp_lcd_panel_vendor.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
+#include "driver/rtc_io.h"
 #include "esp_timer.h"
+#include "esp_sleep.h"
+#include "esp_cam_sensor_xclk.h"
 
 #include "app_video.h"
 #include "app_video_utils.h"
@@ -34,6 +37,7 @@ static esp_lcd_panel_handle_t s_panel = NULL;
 static size_t s_cache_align = 128; // default, will query later
 static uint8_t *s_canvas[EXAMPLE_CAM_BUF_NUM] = {0};
 static uint8_t *s_pose_buf = NULL; // RGB565 buffer (POSE_INPUT_RES x POSE_INPUT_RES)
+static volatile int s_last_frame_idx = 0; // Track latest frame buffer for photo capture
 /* no LVGL path: direct panel draw */
 
 static inline size_t align_up(size_t v, size_t a) { return (v + (a - 1)) & ~(a - 1); }
@@ -42,35 +46,10 @@ static inline size_t align_up(size_t v, size_t a) { return (v + (a - 1)) & ~(a -
 // Removed ping spam task; LOG_TEST_ONLY still enables UART logging and button FALL
 #endif
 
-// Task para monitorar respostas do C6
-static void c6_monitor_task(void *arg)
-{
-    (void)arg;
-    const int uart_port = CONFIG_COPROC_UART_NUM; // Mesmo UART usado para comunicação
-    uint8_t buf[128];
-
-    ESP_LOGI(TAG, "C6 monitor task started - listening on UART%d", uart_port);
-
-    // Certifica que o driver já está instalado (feito pelo coproc_uart)
-    vTaskDelay(pdMS_TO_TICKS(1000)); // Aguarda inicialização
-
-    // Verificar se driver está instalado
-    if (!uart_is_driver_installed(uart_port)) {
-        ESP_LOGE(TAG, "UART%d driver not installed for C6 monitor!", uart_port);
-        vTaskDelete(NULL);
-        return;
-    }
-
-    ESP_LOGI(TAG, "C6 monitor: UART%d driver confirmed, starting monitor loop", uart_port);
-
-    for (;;) {
-        int len = uart_read_bytes(uart_port, buf, sizeof(buf) - 1, pdMS_TO_TICKS(100));
-        if (len > 0) {
-            buf[len] = '\0';
-            ESP_LOGI(TAG, "C6_RESPONSE: %s", buf); // Mostrar respostas do C6
-        }
-    }
-}
+// REMOVIDO: c6_monitor_task causava conflito com coproc_uart_rx_task
+// Ambas tentavam ler do mesmo UART, causando perda de dados
+// Agora apenas coproc_uart_rx_task lida com recepção
+// As respostas do C6 aparecem nos logs como "C6[u2]: ..."
 
 // Button on GPIO3 triggers a manual FALL test message to C6
 #define FALL_TEST_BTN_GPIO 3
@@ -120,6 +99,9 @@ static void fall_test_btn_task(void *arg)
 
 static void frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index, uint32_t cam_w, uint32_t cam_h, size_t cam_len)
 {
+    // Track latest frame for photo capture
+    s_last_frame_idx = camera_buf_index;
+
     // Scale & center-crop to LCD size
     size_t out_sz = align_up(BSP_LCD_H_RES * BSP_LCD_V_RES * 2, s_cache_align);
 
@@ -261,6 +243,23 @@ static void frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index, uint32_t cam
     esp_lcd_panel_draw_bitmap(s_panel, 0, 0, BSP_LCD_H_RES, BSP_LCD_V_RES, s_canvas[camera_buf_index]);
 }
 
+const uint16_t* app_main_get_latest_frame(int *width, int *height)
+{
+    // Return latest LCD frame for photo capture
+    if (!s_canvas[s_last_frame_idx]) {
+        return NULL;
+    }
+
+    if (width) {
+        *width = BSP_LCD_H_RES;
+    }
+    if (height) {
+        *height = BSP_LCD_V_RES;
+    }
+
+    return (const uint16_t *)s_canvas[s_last_frame_idx];
+}
+
 void app_main(void)
 {
     // If bridge trigger held at boot, start USB<->UART bridge for C6 flashing
@@ -278,26 +277,51 @@ void app_main(void)
 
     // Start co-processor UART communication with C6
 #if CONFIG_COPROC_UART_ENABLE
-    // Always initialize UART for fallback communication
+    // STEP 1: Initialize UART FIRST (creates semaphore for C6_READY detection)
     ESP_LOGI(TAG, "Initializing UART communication with C6...");
     esp_err_t uart_init_ret = coproc_uart_init();
-    if (uart_init_ret == ESP_OK) {
-        ESP_LOGI(TAG, "UART init successful, starting RX log task");
-        (void)coproc_uart_start_rx_log();
-
-        // Test UART communication immediately after init
-        ESP_LOGI(TAG, "Testing UART TX to C6...");
-        vTaskDelay(pdMS_TO_TICKS(500));  // Wait for C6 to be ready
-        for (int i = 0; i < 3; i++) {
-            char test_msg[64];
-            snprintf(test_msg, sizeof(test_msg), "P4: UART test message #%d", i+1);
-            esp_err_t send_ret = coproc_uart_send_line(test_msg);
-            ESP_LOGI(TAG, "Test message %d send result: %s", i+1, esp_err_to_name(send_ret));
-            vTaskDelay(pdMS_TO_TICKS(500));
-        }
-        ESP_LOGI(TAG, "UART test complete - check C6 logs for received messages");
-    } else {
+    if (uart_init_ret != ESP_OK) {
         ESP_LOGE(TAG, "UART init failed: %s", esp_err_to_name(uart_init_ret));
+    } else {
+        ESP_LOGI(TAG, "UART init successful, starting RX log task");
+        // Esta é a ÚNICA task que deve ler do UART
+        (void)coproc_uart_start_rx_log();
+        ESP_LOGI(TAG, "RX monitoring active - ready to detect C6_READY signal");
+
+        // Give RX task time to start and be ready
+        vTaskDelay(pdMS_TO_TICKS(200));
+
+        // STEP 2: Now reset C6 (with UART RX already listening for C6_READY)
+        ESP_LOGI(TAG, "Ensuring C6 boots from flash (not download mode)...");
+        gpio_reset_pin(GPIO_NUM_33);
+        gpio_set_direction(GPIO_NUM_33, GPIO_MODE_OUTPUT);
+        gpio_set_level(GPIO_NUM_33, 1);  // HIGH = boot from flash (not download mode)
+
+        ESP_LOGI(TAG, "Resetting C6 coprocessor...");
+        gpio_reset_pin(GPIO_NUM_9);
+        gpio_set_direction(GPIO_NUM_9, GPIO_MODE_OUTPUT);
+        gpio_set_level(GPIO_NUM_9, 0);  // Assert reset (LOW)
+        vTaskDelay(pdMS_TO_TICKS(100));
+        gpio_set_level(GPIO_NUM_9, 1);  // Release reset (HIGH)
+
+        // STEP 3: Wait for C6_READY signal (C6 boots, connects WiFi, syncs time, then sends C6_READY)
+        // This can take up to 30-40 seconds depending on WiFi/SNTP!
+        ESP_LOGI(TAG, "⏳ Waiting for C6_READY signal (timeout: 45 seconds)...");
+        ESP_LOGI(TAG, "   C6 needs time to: boot → WiFi connect → SNTP sync → send C6_READY");
+        esp_err_t ready_ret = coproc_uart_wait_for_c6_ready(45000);  // 45s timeout
+
+        if (ready_ret == ESP_OK) {
+            ESP_LOGI(TAG, "✅ C6 is ready! Proceeding with P4 initialization");
+
+            // Now safe to send test message
+            ESP_LOGI(TAG, "Sending test message to C6...");
+            esp_err_t send_ret = coproc_uart_send_line("P4_PING");
+            ESP_LOGI(TAG, "Test send result: %s (expecting C6_ACK)", esp_err_to_name(send_ret));
+            vTaskDelay(pdMS_TO_TICKS(1000));  // Wait for C6_ACK response
+        } else {
+            ESP_LOGW(TAG, "⚠️  C6_READY timeout! C6 may not be responding properly");
+            ESP_LOGW(TAG, "    Check C6 logs for WiFi/SNTP issues. Continuing anyway...");
+        }
     }
 
     // SDIO DISABLED: Interferes with UART communication (resets C6 during init)
@@ -328,20 +352,76 @@ void app_main(void)
     return;
 #endif
 
-    // Network: connect Wi‑Fi if configured
-    if (strlen(CONFIG_WIFI_SSID) > 0) {
-        ESP_LOGI(TAG, "Init Wi‑Fi");
-        (void)net_init_wifi();
-    } else {
-        ESP_LOGW(TAG, "WIFI_SSID vazio – pulando Wi‑Fi");
+    // TESTE: BSP minimalista - power rails SEM XCLK
+    ESP_LOGW(TAG, "🔧 TESTE #2: BSP sem XCLK (apenas power rails)");
+    ESP_LOGW(TAG, "🔧 XCLK 24MHz desabilitado para evitar interferência UART");
+
+    // Network: WiFi P4 permanece DESABILITADO (usuário não quer)
+    ESP_LOGW(TAG, "WIFI_SSID vazio – pulando Wi‑Fi P4");
+
+    // BSP CUSTOMIZADO: Init completo EXCETO C6_EN_PIN
+    // IMPORTANTE: rtc_gpio_init(BSP_C6_EN_PIN) reseta o C6, quebrando comunicação UART
+    // Solução: Inicializar todos os componentes do BSP, mas pular C6_EN_PIN
+    ESP_LOGI(TAG, "Init BSP (custom - skip C6_EN_PIN to avoid C6 reset)");
+    {
+        // XCLK 24MHz para câmera
+        esp_cam_sensor_xclk_config_t cam_xclk_config = {
+            .esp_clock_router_cfg = {
+                .xclk_pin = BSP_CAMERA_XCLK_PIN,
+                .xclk_freq_hz = BSP_MIPI_CAMERA_XCLK_FREQUENCY,
+            }
+        };
+        esp_cam_sensor_xclk_handle_t xclk_handle = NULL;
+        ESP_ERROR_CHECK(esp_cam_sensor_xclk_allocate(ESP_CAM_SENSOR_XCLK_ESP_CLOCK_ROUTER, &xclk_handle));
+        ESP_ERROR_CHECK(esp_cam_sensor_xclk_start(xclk_handle, &cam_xclk_config));
+
+        // SD card power enable (GPIO normal)
+        const gpio_config_t sdcard_io_config = {
+            .pin_bit_mask = BIT64(BSP_SD_EN_PIN),
+            .mode = GPIO_MODE_OUTPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE
+        };
+        ESP_ERROR_CHECK(gpio_config(&sdcard_io_config));
+        gpio_set_level(BSP_SD_EN_PIN, 0);  // SD desabilitado
+
+        // Camera reset pin (GPIO normal)
+        const gpio_config_t rst_io_config = {
+            .pin_bit_mask = BIT64(BSP_CAMERA_RST_PIN),
+            .mode = GPIO_MODE_OUTPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE
+        };
+        ESP_ERROR_CHECK(gpio_config(&rst_io_config));
+        gpio_set_level(BSP_CAMERA_RST_PIN, 1);  // RST high
+
+        // Sleep power domain config
+        esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+        esp_sleep_pd_config(ESP_PD_DOMAIN_VDDSDIO, ESP_PD_OPTION_ON);
+
+        // RTC GPIO APENAS para camera, NÃO para C6!
+        rtc_gpio_init(BSP_CAMERA_EN_PIN);
+        // CRÍTICO: NÃO chamar rtc_gpio_init(BSP_C6_EN_PIN) - reseta o C6!
+        rtc_gpio_set_direction(BSP_CAMERA_EN_PIN, RTC_GPIO_MODE_OUTPUT_ONLY);
+        rtc_gpio_pulldown_dis(BSP_CAMERA_EN_PIN);
+        rtc_gpio_pullup_dis(BSP_CAMERA_EN_PIN);
+        rtc_gpio_hold_dis(BSP_CAMERA_EN_PIN);
+        rtc_gpio_set_level(BSP_CAMERA_EN_PIN, 1);  // Camera power ON
+        rtc_gpio_hold_en(BSP_CAMERA_EN_PIN);
+
+        ESP_LOGI(TAG, "✅ Custom BSP initialized (C6_EN_PIN skipped)");
     }
 
-    // Board init (power rails, XCLK, etc.)
-    ESP_LOGI(TAG, "Init BSP");
-    ESP_ERROR_CHECK(bsp_p4_eye_init());
+    // I2C init (necessário para câmera SCCB)
+    ESP_LOGI(TAG, "Init I2C");
+    ESP_ERROR_CHECK(bsp_i2c_init());
+    i2c_master_bus_handle_t i2c_handle;
+    ESP_ERROR_CHECK(bsp_get_i2c_bus_handle(&i2c_handle));
 
-    // Display: bring up panel via BSP at 80 MHz (original working path)
-    ESP_LOGI(TAG, "Init display (BSP 80MHz)");
+    // Display init
+    ESP_LOGI(TAG, "Init display");
     esp_lcd_panel_io_handle_t io = NULL;
     const bsp_display_config_t disp_cfg = {
         .max_transfer_sz = BSP_LCD_H_RES * 10 * sizeof(uint16_t),
@@ -350,17 +430,11 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, true));
     ESP_ERROR_CHECK(bsp_display_backlight_on());
 
-    // I2C for SCCB
-    ESP_LOGI(TAG, "Init I2C");
-    ESP_ERROR_CHECK(bsp_i2c_init());
-    i2c_master_bus_handle_t i2c_handle;
-    ESP_ERROR_CHECK(bsp_get_i2c_bus_handle(&i2c_handle));
-
-    // PPA utils
+    // PPA (Pixel Processing Accelerator)
     ESP_LOGI(TAG, "Init PPA utils");
     ESP_ERROR_CHECK(app_video_utils_init());
 
-    // Pose overlay init (ESP-DL)
+    // Pose overlay (ESP-DL)
     ESP_LOGI(TAG, "Init Pose overlay");
     ESP_ERROR_CHECK(pose_overlay_init());
 
@@ -387,42 +461,28 @@ void app_main(void)
     ESP_ERROR_CHECK(gpio_set_direction(FALL_DETECTION_LED_GPIO, GPIO_MODE_OUTPUT));
     ESP_ERROR_CHECK(gpio_set_level(FALL_DETECTION_LED_GPIO, 0)); // Start with LED OFF
 
-    // Cache alignment for DMA-friendly buffers
+    // Camera MIPI-CSI
+    ESP_LOGI(TAG, "Init camera");
     (void)esp_cache_get_alignment(MALLOC_CAP_SPIRAM, &s_cache_align);
-
-    // Allocate two canvas buffers for LCD blit
     size_t canvas_sz = align_up(BSP_LCD_H_RES * BSP_LCD_V_RES * 2, s_cache_align);
     for (int i = 0; i < EXAMPLE_CAM_BUF_NUM; ++i) {
         s_canvas[i] = heap_caps_aligned_calloc(s_cache_align, 1, canvas_sz, MALLOC_CAP_SPIRAM);
         ESP_ERROR_CHECK(s_canvas[i] ? ESP_OK : ESP_ERR_NO_MEM);
     }
-
-    // Allocate dedicated pose buffer (higher resolution than LCD if desired)
     size_t pose_sz = align_up(POSE_INPUT_RES * POSE_INPUT_RES * 2, s_cache_align);
     s_pose_buf = heap_caps_aligned_calloc(s_cache_align, 1, pose_sz, MALLOC_CAP_SPIRAM);
     ESP_ERROR_CHECK(s_pose_buf ? ESP_OK : ESP_ERR_NO_MEM);
     ESP_LOGI(TAG, "Allocated pose buffer %dx%d (%u bytes)", POSE_INPUT_RES, POSE_INPUT_RES, (unsigned)pose_sz);
-
-    // No edge buffers (drawing full screen only)
-
-    // Init camera (esp_video)
-    ESP_LOGI(TAG, "Init camera");
     ESP_ERROR_CHECK(app_video_main(i2c_handle));
-
     int cam_fd = app_video_open(EXAMPLE_CAM_DEV_PATH, APP_VIDEO_FMT);
     ESP_ERROR_CHECK_WITHOUT_ABORT((cam_fd >= 0) ? ESP_OK : ESP_FAIL);
     if (cam_fd < 0) {
         ESP_LOGE(TAG, "Failed to open camera");
         return;
     }
-
-    // Apply camera tuning to increase contrast/visibility for pose
     app_video_apply_pose_tuning(cam_fd);
-
     ESP_ERROR_CHECK(app_video_set_bufs(cam_fd, EXAMPLE_CAM_BUF_NUM, NULL));
     ESP_ERROR_CHECK(app_video_register_frame_operation_cb(frame_cb));
-
-    // Start streaming on core 0
     ESP_LOGI(TAG, "Start video stream");
     ESP_ERROR_CHECK(app_video_stream_task_start(cam_fd, 0));
 }

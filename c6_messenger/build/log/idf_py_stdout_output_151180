@@ -1,0 +1,41 @@
+Command: ninja all
+[1/9] Performing build step for 'bootloader'
+[1/1] cd /home/alvaro/Downloads/esp-p4-pose/c6_messenger/build/bootloader/esp-idf/esptool_py && /home/alvaro/.espressif/python_env/idf5.5_py3.12_env/bin/python /home/alvaro/Downloads/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x0 /home/alvaro/Downloads/esp-p4-pose/c6_messenger/build/bootloader/bootloader.bin
+Bootloader binary size 0x57e0 bytes. 0x2820 bytes (31%) free.
+[2/9] No install step for 'bootloader'
+[3/9] Completed 'bootloader'
+[4/9] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj
+/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/main.c: In function 'app_main':
+/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/main.c:550:15: warning: unused variable 'sdio_ret' [-Wunused-variable]
+  550 |     esp_err_t sdio_ret = ESP_FAIL;  // Force UART-only mode
+      |               ^~~~~~~~
+/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/main.c: At top level:
+/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/main.c:492:12: warning: 'null_vprintf' defined but not used [-Wunused-function]
+  492 | static int null_vprintf(const char *fmt, va_list args) {
+      |            ^~~~~~~~~~~~
+/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/main.c:95:13: warning: 'sdio_message_handler' defined but not used [-Wunused-function]
+   95 | static void sdio_message_handler(const char *message)
+      |             ^~~~~~~~~~~~~~~~~~~~
+/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/main.c:67:21: warning: 's_fall_spin' defined but not used [-Wunused-variable]
+   67 | static portMUX_TYPE s_fall_spin = portMUX_INITIALIZER_UNLOCKED;
+      |                     ^~~~~~~~~~~
+/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/main.c:66:16: warning: 's_cooldown' defined but not used [-Wunused-variable]
+   66 | static int64_t s_cooldown = 0;
+      |                ^~~~~~~~~~
+/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/main.c:65:16: warning: 's_last_sent' defined but not used [-Wunused-variable]
+   65 | static int64_t s_last_sent = 0;
+      |                ^~~~~~~~~~~
+/home/alvaro/Downloads/esp-p4-pose/c6_messenger/main/main.c:51:13: warning: 'send_response' defined but not used [-Wunused-function]
+   51 | static void send_response(const char *s)
+      |             ^~~~~~~~~~~~~
+[5/9] Linking C static library esp-idf/main/libmain.a
+[6/9] Generating esp-idf/esp_system/ld/sections.ld
+[7/9] Linking CXX executable c6_messenger.elf
+[8/9] Generating binary image from built executable
+esptool.py v4.10.0
+Creating esp32c6 image...
+Merged 1 ELF section
+Successfully created esp32c6 image.
+Generated /home/alvaro/Downloads/esp-p4-pose/c6_messenger/build/c6_messenger.bin
+[9/9] cd /home/alvaro/Downloads/esp-p4-pose/c6_messenger/build/esp-idf/esptool_py && /home/alvaro/.espressif/python_env/idf5.5_py3.12_env/bin/python /home/alvaro/Downloads/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /home/alvaro/Downloads/esp-p4-pose/c6_messenger/build/partition_table/partition-table.bin /home/alvaro/Downloads/esp-p4-pose/c6_messenger/build/c6_messenger.bin
+c6_messenger.bin binary size 0x10e0b0 bytes. Smallest app partition is 0x180000 bytes. 0x71f50 bytes (30%) free.

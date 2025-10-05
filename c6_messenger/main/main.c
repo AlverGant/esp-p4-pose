@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdarg.h>
 
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
@@ -15,11 +16,16 @@
 #include "esp_http_client.h"
 #include "esp_err.h"
 #include "esp_timer.h"
+#include "esp_task_wdt.h"
 #include "driver/uart.h"
+#include "driver/gpio.h"
 #include "esp_sntp.h"
 #include "esp_crt_bundle.h"
 #include "coproc_sdio_slave.h"
 #include "hosted_alert_server.h"
+
+// Debug LED DISABLED - testing if GPIO8 conflicts with UART
+// #define DEBUG_LED_GPIO 8
 
 static const char *TAG = "c6_msg";
 static const int C6_UART_PORT = UART_NUM_0;
@@ -32,13 +38,9 @@ static void uart_tx_line(const char *s)
     memcpy(buf, s, n);
     buf[n++] = '\n';
 
-    // CRITICAL FIX: Add flush like p4_sdio_flash does
     int written = uart_write_bytes(C6_UART_PORT, buf, n);
     if (written > 0) {
-        esp_err_t flush_ret = uart_wait_tx_done(C6_UART_PORT, pdMS_TO_TICKS(1000));
-        ESP_LOGI(TAG, "TX: %d bytes (flush=%s)", written, esp_err_to_name(flush_ret));
-    } else {
-        ESP_LOGW(TAG, "TX failed: uart_write_bytes returned %d", written);
+        uart_wait_tx_done(C6_UART_PORT, pdMS_TO_TICKS(1000));
     }
 }
 
@@ -100,58 +102,25 @@ static void sdio_message_handler(const char *message)
 
 static esp_err_t handle_fall_alert(const char *message, const char *transport, bool feedback)
 {
-    ESP_LOGI(TAG, "%s FALL: %s", transport, message);
+    (void)transport;
+    (void)feedback;
 
-    if (feedback) {
-        char ack[64];
-        snprintf(ack, sizeof(ack), "C6: FALL recebido via %s", transport);
-        send_response(ack);
-        send_response(message);
-    }
+    // CRITICAL: NO LOGGING - called from uart_reader_task which reads from UART0
+    // Any ESP_LOGI() here will write to UART0, causing feedback loop and lockup
 
-    int64_t now = esp_timer_get_time();
-    if (s_cooldown > 0) {
-        int64_t last;
-        portENTER_CRITICAL(&s_fall_spin);
-        last = s_last_sent;
-        portEXIT_CRITICAL(&s_fall_spin);
-
-        int64_t elapsed = now - last;
-        if (elapsed < s_cooldown) {
-            ESP_LOGI(TAG, "%s cooldown ativo (%lld ms restantes)", transport,
-                     (long long)((s_cooldown - elapsed) / 1000));
-            if (feedback) {
-                send_response("C6: Cooldown, ignorado");
-            }
-            return ESP_ERR_INVALID_STATE;
-        }
-    }
-
+    // Send to Telegram (no cooldown - removed for testing)
     esp_err_t err = telegram_send(message);
-    if (err == ESP_OK) {
-        portENTER_CRITICAL(&s_fall_spin);
-        s_last_sent = esp_timer_get_time();
-        portEXIT_CRITICAL(&s_fall_spin);
-    } else if (feedback) {
-        char line[64];
-        snprintf(line, sizeof(line), "C6: Telegram erro %d", (int)err);
-        send_response(line);
-    }
+
     return err;
 }
 
 static esp_err_t handle_incoming_message(const char *message, const char *transport, bool feedback)
 {
+    // CRITICAL: NO LOGGING - called from uart_reader_task which reads from UART0
+    // Any ESP_LOGI() here will write to UART0, causing feedback loop and lockup
+
     if (!message || !*message) {
         return ESP_ERR_INVALID_ARG;
-    }
-
-    ESP_LOGI(TAG, "%s RX: %s", transport, message);
-
-    if (feedback) {
-        char ack[64];
-        snprintf(ack, sizeof(ack), "C6: %s msg recebida", transport);
-        send_response(ack);
     }
 
     if (strncmp(message, "FALL", 4) == 0) {
@@ -186,12 +155,9 @@ static esp_err_t wifi_connect(void)
         vTaskDelay(pdMS_TO_TICKS(100));
         esp_netif_ip_info_t ip;
         if (esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), &ip) == ESP_OK && ip.ip.addr) {
-            ESP_LOGI(TAG, "Wi-Fi ready");
-            send_response("C6: Wi-Fi conectado");
             return ESP_OK;
         }
     }
-    ESP_LOGW(TAG, "Wi-Fi IP not acquired yet");
     return ESP_OK;
 }
 
@@ -205,13 +171,10 @@ static void sntp_sync(void)
         time_t now = 0; struct tm t = {0};
         time(&now); localtime_r(&now, &t);
         if (t.tm_year > (2016 - 1900)) {
-            ESP_LOGI(TAG, "SNTP ok: %04d-%02d-%02d %02d:%02d", t.tm_year+1900, t.tm_mon+1, t.tm_mday, t.tm_hour, t.tm_min);
-            send_response("C6: SNTP OK");
             return;
         }
         vTaskDelay(pdMS_TO_TICKS(500));
     }
-    ESP_LOGW(TAG, "SNTP timeout");
 }
 
 esp_err_t telegram_send(const char *text)
@@ -250,18 +213,33 @@ esp_err_t telegram_send(const char *text)
     esp_err_t err = esp_http_client_perform(c);
     if (err == ESP_OK) {
         int sc = esp_http_client_get_status_code(c);
-        ESP_LOGI(TAG, "Telegram status=%d", sc);
-        char l[64]; snprintf(l, sizeof l, "C6: Telegram status=%d", sc); send_response(l);
         if (sc != 200) err = ESP_FAIL;
-    } else {
-        ESP_LOGW(TAG, "HTTP error %s", esp_err_to_name(err));
-        char l[64]; snprintf(l, sizeof l, "C6: HTTP erro %d", (int)err); send_response(l);
     }
     esp_http_client_cleanup(c);
     return err;
 }
 
-// Telegram photo send function
+// HTTP event handler to capture error responses
+static char s_http_response_buffer[512];
+static int s_http_response_len = 0;
+
+static esp_err_t telegram_http_event_handler(esp_http_client_event_t *evt)
+{
+    switch (evt->event_id) {
+        case HTTP_EVENT_ON_DATA:
+            // Capture response data
+            if (s_http_response_len + evt->data_len < sizeof(s_http_response_buffer)) {
+                memcpy(s_http_response_buffer + s_http_response_len, evt->data, evt->data_len);
+                s_http_response_len += evt->data_len;
+            }
+            break;
+        default:
+            break;
+    }
+    return ESP_OK;
+}
+
+// Telegram photo send function - multipart/form-data upload
 esp_err_t telegram_send_photo(const uint8_t *image_data, size_t image_len, const char *caption)
 {
     if (!image_data || image_len == 0) return ESP_ERR_INVALID_ARG;
@@ -273,184 +251,320 @@ esp_err_t telegram_send_photo(const uint8_t *image_data, size_t image_len, const
     char url[256];
     snprintf(url, sizeof(url), "https://api.telegram.org/bot%s/sendPhoto", CONFIG_TELEGRAM_BOT_TOKEN);
 
-    // For now, log that we would send a photo
-    // Full implementation would require multipart/form-data encoding
-    ESP_LOGI(TAG, "Would send photo to Telegram: %zu bytes, caption: %s", image_len, caption ? caption : "none");
-    send_response("C6: Photo upload not yet implemented");
+    // Multipart/form-data boundary
+    const char *boundary = "----FormBoundary7MA4YWxkTrZu0gW";
 
-    // TODO: Implement multipart/form-data upload
-    // This requires more complex HTTP handling with boundaries
+    // Build multipart body
+    char *body = NULL;
+    size_t body_len = 0;
 
-    return ESP_ERR_NOT_SUPPORTED;
+    // Calculate body size
+    size_t header_len = 512;  // Estimate for headers
+    body_len = header_len + image_len + 512;  // Headers + image + footer
+
+    // C6 doesn't have SPIRAM, use internal RAM
+    body = malloc(body_len);
+    if (!body) {
+        ESP_LOGE(TAG, "Failed to allocate multipart body");
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Build multipart form-data body
+    size_t offset = 0;
+
+    // Part 1: chat_id field
+    offset += snprintf(body + offset, body_len - offset,
+        "--%s\r\n"
+        "Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n"
+        "%s\r\n",
+        boundary, CONFIG_TELEGRAM_CHAT_ID);
+
+    // Part 2: photo file
+    offset += snprintf(body + offset, body_len - offset,
+        "--%s\r\n"
+        "Content-Disposition: form-data; name=\"photo\"; filename=\"fall.jpg\"\r\n"
+        "Content-Type: image/jpeg\r\n\r\n",
+        boundary);
+
+    // Copy image data
+    memcpy(body + offset, image_data, image_len);
+    offset += image_len;
+
+    // Must add CRLF after binary data before next boundary
+    offset += snprintf(body + offset, body_len - offset, "\r\n");
+
+    // Part 3: caption (optional)
+    if (caption && strlen(caption) > 0) {
+        offset += snprintf(body + offset, body_len - offset,
+            "--%s\r\n"
+            "Content-Disposition: form-data; name=\"caption\"\r\n\r\n"
+            "%s\r\n",
+            boundary, caption);
+    }
+
+    // Final boundary
+    offset += snprintf(body + offset, body_len - offset, "--%s--\r\n", boundary);
+
+    ESP_LOGI(TAG, "Multipart body size: %d bytes (image: %d bytes)", (int)offset, (int)image_len);
+
+    // Reset response buffer
+    s_http_response_len = 0;
+    memset(s_http_response_buffer, 0, sizeof(s_http_response_buffer));
+
+    // Configure HTTP client with event handler
+    esp_http_client_config_t cfg = {
+        .url = url,
+        .method = HTTP_METHOD_POST,
+        .transport_type = HTTP_TRANSPORT_OVER_SSL,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+        .timeout_ms = 30000,  // 30s timeout for photo upload
+        .event_handler = telegram_http_event_handler,
+    };
+    esp_http_client_handle_t client = esp_http_client_init(&cfg);
+    if (!client) {
+        free(body);
+        return ESP_FAIL;
+    }
+
+    // Set multipart/form-data content type with boundary
+    char content_type[128];
+    snprintf(content_type, sizeof(content_type), "multipart/form-data; boundary=%s", boundary);
+    esp_http_client_set_header(client, "Content-Type", content_type);
+    esp_http_client_set_post_field(client, body, offset);
+
+    // Perform request
+    esp_err_t err = esp_http_client_perform(client);
+    if (err == ESP_OK) {
+        int status_code = esp_http_client_get_status_code(client);
+
+        ESP_LOGI(TAG, "Telegram photo upload status: %d, response_len: %d", status_code, s_http_response_len);
+
+        // Log response for debugging
+        if (s_http_response_len > 0) {
+            s_http_response_buffer[s_http_response_len] = '\0';
+            if (status_code != 200) {
+                ESP_LOGE(TAG, "Telegram error response: %s", s_http_response_buffer);
+            } else {
+                ESP_LOGI(TAG, "Telegram response: %s", s_http_response_buffer);
+            }
+        }
+
+        if (status_code != 200) {
+            err = ESP_FAIL;
+        }
+    } else {
+        ESP_LOGE(TAG, "HTTP POST failed: %s", esp_err_to_name(err));
+    }
+
+    esp_http_client_cleanup(client);
+    free(body);
+
+    return err;
 }
+
+// REMOVED: heartbeat_task - causes UART spam and interferes with P4→C6 communication
+
+// State machine for UART reader
+typedef enum {
+    UART_STATE_TEXT,    // Reading text lines
+    UART_STATE_BINARY   // Reading binary photo data
+} uart_state_t;
 
 static void uart_reader_task(void *arg)
 {
     const int uart_port = C6_UART_PORT; // U0TXD/U0RXD
-    ESP_LOGI(TAG, "=== UART READER TASK STARTED ===");
-    // Ensure UART driver with large buffers to prevent blocking
-    if (!uart_is_driver_installed(uart_port)) {
-        ESP_LOGI(TAG, "Installing UART%d driver (RX=4096, TX=2048)", uart_port);
-        uart_driver_install(uart_port, 4096, 2048, 0, NULL, 0);
-    } else {
-        ESP_LOGI(TAG, "UART%d driver already installed", uart_port);
-    }
 
-    char line[256]; size_t n = 0;
+    char line[256];
+    size_t n = 0;
     uint8_t ch;
-    int heartbeat_counter = 0;
-    ESP_LOGI(TAG, "UART reader: waiting for messages...");
+    int msg_count = 0;
+    int heartbeat = 0;
+    bool led_state = false;
 
-    // Force immediate heartbeat to confirm task is running
-    ESP_LOGI(TAG, "UART reader entering main loop (port=%d)", uart_port);
+    // State machine
+    uart_state_t state = UART_STATE_TEXT;
+    size_t photo_size = 0;
+    size_t photo_received = 0;
+    uint8_t *photo_buf = NULL;
+
+    // CRITICAL: Disable ALL logging in this task to prevent UART interference
+    // Logging to UART0 while reading from UART0 creates a feedback loop that causes lockup
 
     for (;;) {
         int r = uart_read_bytes(uart_port, &ch, 1, pdMS_TO_TICKS(100));
 
-        // Heartbeat every 10 seconds to show task is alive
-        if (++heartbeat_counter >= 100) {  // 100 * 100ms = 10s
-            ESP_LOGI(TAG, "UART reader heartbeat (still running, n=%d)", n);
-            heartbeat_counter = 0;
+        // Heartbeat: LED DISABLED for debugging
+        if (++heartbeat >= 100) {  // 100 * 100ms = 10s
+            led_state = !led_state;
+            // gpio_set_level(DEBUG_LED_GPIO, led_state);
+            heartbeat = 0;
         }
 
         if (r == 1) {
-            // Debug: log first byte received
-            static bool first_byte_logged = false;
-            if (!first_byte_logged) {
-                ESP_LOGI(TAG, "UART: First byte received: 0x%02X '%c'", ch, (ch >= 32 && ch < 127) ? ch : '?');
-                first_byte_logged = true;
-            }
+            if (state == UART_STATE_TEXT) {
+                // TEXT MODE: Read lines
+                if (ch == '\n' || ch == '\r') {
+                    if (n > 0) {
+                        line[n] = 0;
+                        msg_count++;
 
-            if (ch == '\n' || ch == '\r') {
-                line[n] = 0;
-                if (n > 0 && line[0]) {
-                    // Log EVERY line for debugging
-                    ESP_LOGI(TAG, "UART RX line (len=%d): %s", n, line);
+                        // Check if it's a PHOTO command
+                        if (strncmp(line, "PHOTO:", 6) == 0) {
+                            // Parse photo size
+                            photo_size = atoi(line + 6);
+                            if (photo_size > 0 && photo_size < 100000) {  // Max 100KB (C6 has limited RAM)
+                                // Allocate buffer for photo - C6 doesn't have SPIRAM, use internal RAM
+                                photo_buf = malloc(photo_size);
+                                if (photo_buf) {
+                                    photo_received = 0;
+                                    state = UART_STATE_BINARY;
+                                    uart_tx_line("C6_PHOTO_READY");
+                                    // NO LOGGING - prevent UART interference
+                                } else {
+                                    uart_tx_line("C6_PHOTO_ERR_MEM");
+                                }
+                            } else {
+                                uart_tx_line("C6_PHOTO_ERR_SIZE");
+                            }
+                        } else {
+                            // Normal text command
+                            uart_tx_line("C6_ACK");
 
-                    // CRITICAL: ALWAYS respond to P4 for debug
-                    char ack[128];
-                    snprintf(ack, sizeof(ack), "C6_ACK: Received %d bytes", n);
-                    uart_tx_line(ack);
-                    ESP_LOGI(TAG, "Sent ACK back to P4");
-
-                    // Check for FALL message first
-                    if (strncmp(line, "FALL", 4) == 0) {
-                        ESP_LOGI(TAG, "*** FALL MESSAGE DETECTED ***");
-                        (void)handle_incoming_message(line, "UART", true);
+                            // Process message silently
+                            if (strncmp(line, "FALL", 4) == 0) {
+                                handle_incoming_message(line, "UART", true);
+                            }
+                        }
                     }
+                    n = 0;
+                } else if (n < sizeof(line)-1) {
+                    line[n++] = (char)ch;
+                } else {
+                    // Overflow: reset silently
+                    n = 0;
                 }
-                n = 0;  // Reset buffer after processing line
-            } else if (n < sizeof(line)-1) {
-                line[n++] = (char)ch;
             } else {
-                // overflow, reset
-                ESP_LOGW(TAG, "UART buffer overflow, resetting");
-                n = 0;
+                // BINARY MODE: Read photo data
+                photo_buf[photo_received++] = ch;
+
+                if (photo_received >= photo_size) {
+                    // Photo complete - validate JPEG format
+                    bool valid_jpeg = false;
+                    if (photo_size >= 4) {
+                        // Check JPEG magic bytes: starts with 0xFF 0xD8, ends with 0xFF 0xD9
+                        bool valid_start = (photo_buf[0] == 0xFF && photo_buf[1] == 0xD8);
+                        bool valid_end = (photo_buf[photo_size-2] == 0xFF && photo_buf[photo_size-1] == 0xD9);
+                        valid_jpeg = valid_start && valid_end;
+
+                        ESP_LOGI(TAG, "JPEG validation: start=%d end=%d (first bytes: %02X %02X, last bytes: %02X %02X)",
+                                 valid_start, valid_end,
+                                 photo_buf[0], photo_buf[1],
+                                 photo_buf[photo_size-2], photo_buf[photo_size-1]);
+                    }
+
+                    if (!valid_jpeg) {
+                        ESP_LOGE(TAG, "Invalid JPEG data received!");
+                        uart_tx_line("C6_PHOTO_ERR_INVALID");
+                    } else {
+                        // Upload to Telegram (WITHOUT caption for now to debug)
+                        esp_err_t ret = telegram_send_photo(photo_buf, photo_size, NULL);
+
+                        if (ret == ESP_OK) {
+                            uart_tx_line("C6_PHOTO_OK");
+                        } else {
+                            uart_tx_line("C6_PHOTO_ERR_UPLOAD");
+                        }
+                    }
+
+                    // Free buffer and return to text mode
+                    free(photo_buf);
+                    photo_buf = NULL;
+                    photo_size = 0;
+                    photo_received = 0;
+                    state = UART_STATE_TEXT;
+                }
             }
         }
     }
 }
 
+// Custom vprintf to disable ALL log output to UART
+static int null_vprintf(const char *fmt, va_list args) {
+    return 0;  // Discard all logs
+}
+
 void app_main(void)
 {
-    ESP_LOGI(TAG, "=== C6 APP_MAIN START - FIRMWARE VERSION 2025-10-01-UART-TEST ===");
+    // Wait a bit for P4 UART to be ready
+    vTaskDelay(pdMS_TO_TICKS(500));
+
+    // Debug LED DISABLED for testing
+    // gpio_reset_pin(DEBUG_LED_GPIO);
+    // gpio_set_direction(DEBUG_LED_GPIO, GPIO_MODE_OUTPUT);
+    // gpio_set_level(DEBUG_LED_GPIO, 0);
+
+    // CRITICAL: Initialize UART0 FIRST before anything else
+    uart_config_t uart_cfg = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+
+    // Install driver first (correct order)
+    uart_driver_install(UART_NUM_0, 4096, 2048, 0, NULL, 0);
+    uart_param_config(UART_NUM_0, &uart_cfg);
+    uart_set_pin(UART_NUM_0, 16, 17, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+
+    // Send multiple test messages to ensure we see something
+    for (int i = 0; i < 5; i++) {
+        const char *boot_msg = "C6_BOOT\n";
+        uart_write_bytes(UART_NUM_0, boot_msg, 8);
+        uart_wait_tx_done(UART_NUM_0, pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+
+    // NOTE: Keeping logs enabled for debugging (they go to UART0 → P4 monitor)
+    // If logs interfere with commands, re-enable null_vprintf
+    // esp_log_set_vprintf(null_vprintf);
+
     ESP_ERROR_CHECK(nvs_flash_init());
-    ESP_LOGI(TAG, "=== NVS INIT OK ===");
 
-    // Initialize cooldown from config
-    s_cooldown = (int64_t)CONFIG_TELEGRAM_COOLDOWN_SEC * 1000000LL;
+    // COOLDOWN DISABLED FOR DEBUGGING
+    // s_cooldown = (int64_t)CONFIG_TELEGRAM_COOLDOWN_SEC * 1000000LL;
+    // portENTER_CRITICAL(&s_fall_spin);
+    // s_last_sent = 0;
+    // portEXIT_CRITICAL(&s_fall_spin);
 
-    // IMPORTANTE: Resetar timestamp de último envio para evitar cooldown fantasma no boot
-    portENTER_CRITICAL(&s_fall_spin);
-    s_last_sent = 0;
-    portEXIT_CRITICAL(&s_fall_spin);
-    ESP_LOGI(TAG, "Cooldown resetado (config: %lld segundos)", (long long)(s_cooldown / 1000000LL));
+    // UART already initialized at start of app_main()
 
-    // Configure UART0 with EXPLICIT pins for P4 connection
-    // ESP32-P4-Function-EV-Board schematic shows:
-    // - C6 Pin 31 (TXD0) = GPIO16 (U0TXD default) → connects to P4 GPIO36 (UART2 RX)
-    // - C6 Pin 30 (RXD0) = GPIO17 (U0RXD default) → connects to P4 GPIO35 (UART2 TX)
-    {
-        const int uart_port = C6_UART_PORT;  // UART_NUM_0
+    // CRITICAL: Start UART reader IMMEDIATELY after UART init
+    // This ensures C6 can receive P4 commands ASAP (before WiFi/SNTP delays)
+    // INCREASED stack from 4096 to 8192 to prevent overflow during HTTP calls
+    xTaskCreate(uart_reader_task, "uart_reader", 8192, NULL, 5, NULL);
+    vTaskDelay(pdMS_TO_TICKS(50)); // Give task time to start
 
-        // CRITICAL: If console was using UART0, delete it first!
-        if (uart_is_driver_installed(uart_port)) {
-            ESP_LOGW(TAG, "UART0 driver already installed (probably console), deleting...");
-            uart_driver_delete(uart_port);
-            vTaskDelay(pdMS_TO_TICKS(100));  // Give time for cleanup
-            ESP_LOGI(TAG, "UART0 driver deleted, will reinstall for P4 communication");
-        }
+    // SDIO DISABLED: Using UART-only communication with P4
+    esp_err_t sdio_ret = ESP_FAIL;  // Force UART-only mode
 
-        uart_config_t uc = {
-            .baud_rate = CONFIG_UART_BAUD,
-            .data_bits = UART_DATA_8_BITS,
-            .parity = UART_PARITY_DISABLE,
-            .stop_bits = UART_STOP_BITS_1,
-            .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-            .source_clk = UART_SCLK_DEFAULT,
-        };
-        ESP_ERROR_CHECK(uart_param_config(uart_port, &uc));
-
-        // CRITICAL: Set pins EXPLICITLY (don't trust defaults)
-        ESP_LOGI(TAG, "Setting UART0 pins explicitly: TX=16, RX=17");
-        ESP_ERROR_CHECK(uart_set_pin(uart_port, 16, 17, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-
-        // Large RX buffer to handle P4 messages, TX buffer for responses
-        ESP_LOGI(TAG, "Installing UART0 driver with RX=4096, TX=2048");
-        ESP_ERROR_CHECK(uart_driver_install(uart_port, 4096, 2048, 0, NULL, 0));
-
-        // Clear any garbage from previous console use
-        uart_flush(uart_port);
-        uart_flush_input(uart_port);
-
-        ESP_LOGI(TAG, "=== UART0 INIT OK: GPIO16(TX)→P4_GPIO36, GPIO17(RX)←P4_GPIO35 ===");
-    }
-
-    // Initialize SDIO slave BEFORE Wi-Fi - must be ready when P4 connects
-    ESP_LOGI(TAG, "=== INITIALIZING SDIO SLAVE ===");
-    esp_err_t sdio_ret = coproc_sdio_slave_init();
-    if (sdio_ret == ESP_OK) {
-        ESP_LOGI(TAG, "SDIO slave initialized successfully");
-        uart_tx_line("C6: SDIO slave OK - aguardando P4");
-        // Start SDIO RX with message handler
-        coproc_sdio_slave_start_rx(sdio_message_handler);
-    } else {
-        ESP_LOGW(TAG, "SDIO slave init failed: %s, using UART only", esp_err_to_name(sdio_ret));
-        uart_tx_line("C6: SDIO falhou - usando UART apenas");
-    }
-
-    // Start Wi-Fi after SDIO is ready
-    ESP_LOGI(TAG, "=== STARTING WIFI ===");
+    // Start Wi-Fi (non-blocking for UART reception)
+    ESP_LOGI(TAG, "Connecting to WiFi...");
     wifi_connect();
 
-    // Send startup message to P4 to confirm C6 is alive
-    ESP_LOGI(TAG, "=== SENDING STARTUP MESSAGE TO P4 ===");
-    vTaskDelay(pdMS_TO_TICKS(1000));  // Wait 1s for P4 to be ready
-    uart_tx_line("C6: Firmware started - waiting for P4 messages");
-    vTaskDelay(pdMS_TO_TICKS(500));
-    uart_tx_line("C6: UART0 ready GPIO16(TX) GPIO17(RX)");
-
-    // Start UART reader BEFORE sntp_sync to ensure we can receive messages during boot
-    // CRITICAL: Must be created before any blocking operations!
-    ESP_LOGI(TAG, "=== STARTING UART READER (before SNTP) ===");
-    xTaskCreate(uart_reader_task, "uart_reader", 4096, NULL, 5, NULL);
-    vTaskDelay(pdMS_TO_TICKS(100)); // Give task time to start
-
+    ESP_LOGI(TAG, "Syncing time via SNTP...");
     sntp_sync();
 
-#if CONFIG_HOSTED_ALERT_SERVER_ENABLE
-    {
-        esp_err_t http_err = hosted_alert_server_start(hosted_alert_callback);
-        if (http_err == ESP_OK) {
-            ESP_LOGI(TAG, "Hosted alert HTTP server iniciado na porta %d", CONFIG_HOSTED_ALERT_SERVER_PORT);
-            send_response("C6: Servidor HTTP pronto para alertas");
-        } else {
-            ESP_LOGW(TAG, "Falha ao iniciar servidor HTTP: %s", esp_err_to_name(http_err));
-        }
-    }
-#endif
+    // IMPORTANT: Send C6_READY AFTER WiFi and SNTP are complete
+    // This ensures P4 knows C6 is fully ready for Telegram operations
+    ESP_LOGI(TAG, "✅ C6 fully initialized - sending C6_READY to P4");
+    uart_tx_line("C6_READY");
 
-    if (sdio_ret == ESP_OK) {
-        send_response("C6: Sistema iniciado com SDIO+UART");
-    }
+    // C6 is now ready - will process FALL commands from P4 via UART
+    // and forward them to Telegram
+
+#if CONFIG_HOSTED_ALERT_SERVER_ENABLE
+    hosted_alert_server_start(hosted_alert_callback);
+#endif
 }

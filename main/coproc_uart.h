@@ -14,6 +14,8 @@ esp_err_t coproc_uart_start_rx_log(void);
 esp_err_t coproc_uart_probe_and_start_rx_log(void);
 // Force logs via UART2 (TX=45, RX=46) like esp-serial-flasher example
 esp_err_t coproc_uart_force_uart2_log(void);
+// Wait for C6_READY signal with timeout (0 = wait forever)
+esp_err_t coproc_uart_wait_for_c6_ready(uint32_t timeout_ms);
 
 #ifdef __cplusplus
 }

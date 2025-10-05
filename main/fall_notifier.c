@@ -3,6 +3,8 @@
 #include "coproc_uart.h"
 #include "coproc_sdio.h"
 #include "pose_overlay.h"
+#include "telegram_photo.h"
+#include "app_main.h"
 #include "sdkconfig.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -83,10 +85,20 @@ static esp_err_t fall_notifier_send_locked(const char *source_human,
     const char *label = (source_human && *source_human) ? source_human : "Queda detectada!";
 
     int64_t now = esp_timer_get_time();
+    int elapsed_sec = (int)((now - s_last_sent_us) / 1000000LL);
+    int cooldown_sec = (int)(s_cooldown_us / 1000000LL);
+
+    ESP_LOGI(TAG_NOTIF, "🔔 Evento: '%s' (urgent=%d, elapsed=%ds, cooldown=%ds)",
+             label, urgent, elapsed_sec, cooldown_sec);
+
     if (!urgent && s_cooldown_us > 0 && (now - s_last_sent_us) < s_cooldown_us) {
-        ESP_LOGI(TAG_NOTIF, "Cooldown ativo (%lld ms restantes)",
-                 (long long)((s_cooldown_us - (now - s_last_sent_us)) / 1000));
+        ESP_LOGW(TAG_NOTIF, "⏳ Cooldown ativo no P4: %ds/%ds - evento bloqueado",
+                 elapsed_sec, cooldown_sec);
         return ESP_ERR_INVALID_STATE;
+    }
+
+    if (s_cooldown_us > 0) {
+        ESP_LOGI(TAG_NOTIF, "✓ Cooldown OK no P4: %ds > %ds - processando", elapsed_sec, cooldown_sec);
     }
 
     bool delivered = false;
@@ -110,37 +122,38 @@ static esp_err_t fall_notifier_send_locked(const char *source_human,
 
 #if CONFIG_COPROC_UART_ENABLE
     {
-        char line[224];
-        int written = snprintf(line, sizeof line, CONFIG_COPROC_MSG_TEMPLATE, persons, age_ms, seq);
-        if (written < 0) {
-            line[0] = '\0';
-            written = 0;
-        }
+        // Capture and send photo via C6 to Telegram
+        int width = 0, height = 0;
+        const uint16_t *frame = app_main_get_latest_frame(&width, &height);
 
-        if (source_human && *source_human && written < (int)(sizeof line - 1)) {
-            char tag[48];
-            build_reason_tag(source_human, tag, sizeof tag);
-            if (tag[0] != '\0') {
-                snprintf(line + written, sizeof line - written, " reason=%s", tag);
+        if (frame && width > 0 && height > 0) {
+            ESP_LOGI(TAG_NOTIF, "📸 Capturando foto %dx%d para envio via C6", width, height);
+
+            // Build caption with event details
+            char caption[128];
+            snprintf(caption, sizeof(caption), "⚠️ %s (pessoas=%d, seq=%d)", label, persons, seq);
+
+            esp_err_t err_photo = telegram_send_photo_from_frame(frame, width, height, caption);
+            if (err_photo == ESP_OK) {
+                delivered = true;
+                last_err = ESP_OK;
+                ESP_LOGI(TAG_NOTIF, "✓ Foto enviada via UART para C6");
+            } else {
+                last_err = err_photo;
+                ESP_LOGE(TAG_NOTIF, "✗ Falha ao enviar foto: %s", esp_err_to_name(err_photo));
             }
-        }
-
-        ESP_LOGI(TAG_NOTIF, "Enviando via UART: %s", line);
-        esp_err_t err_uart = coproc_uart_send_line(line);
-        if (err_uart == ESP_OK) {
-            delivered = true;
-            last_err = ESP_OK;
-            ESP_LOGI(TAG_NOTIF, "UART enviado com sucesso");
         } else {
-            last_err = err_uart;
-            ESP_LOGW(TAG_NOTIF, "UART falhou (%s) - SDIO desabilitado", esp_err_to_name(err_uart));
-            // SDIO fallback disabled to avoid interference
-            // esp_err_t err_sdio = coproc_sdio_send_line(line);
-            // if (err_sdio == ESP_OK) {
-            //     delivered = true;
-            //     last_err = ESP_OK;
-            //     ESP_LOGI(TAG_NOTIF, "SDIO enviado: %s", line);
-            // }
+            ESP_LOGW(TAG_NOTIF, "⚠️  Frame não disponível para foto - enviando texto");
+            // Fallback: send text message if frame not available
+            char line[64];
+            snprintf(line, sizeof line, "FALL p=%d s=%d", persons, seq);
+            esp_err_t err_uart = coproc_uart_send_line(line);
+            if (err_uart == ESP_OK) {
+                delivered = true;
+                last_err = ESP_OK;
+            } else {
+                last_err = err_uart;
+            }
         }
     }
 #endif

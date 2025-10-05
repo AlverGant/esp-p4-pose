@@ -1,0 +1,51 @@
+dependencies:
+  # ESP32-P4-EYE BSP (use local source tree)
+  esp32_p4_eye:
+    path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/common_components/esp32_p4_eye"
+
+  # Override registry components with local managed copies from the example
+  lvgl/lvgl:
+    path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/lvgl__lvgl"
+  espressif/esp_lvgl_port:
+    path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_lvgl_port"
+  button:
+    path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__button"
+  espressif/knob:
+    path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__knob"
+  espressif/esp_video:
+    path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_video"
+  espressif/esp_cam_sensor:
+    path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_cam_sensor"
+  espressif/esp_sccb_intf:
+    path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_sccb_intf"
+  espressif/esp_h264:
+    path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_h264"
+  espressif/esp_ipa:
+    path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_ipa"
+  espressif/esp_new_jpeg:
+    path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_new_jpeg"
+
+  # SDIO host helper removed (UART-only path)
+
+  # Pose estimation model (ESP-DL)
+  espressif/coco_pose:
+    version: "^0.2.0"
+    override_path: "/home/alvaro/Downloads/esp-dl/models/coco_pose"
+  espressif/esp_codec_dev:
+    path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_codec_dev"
+  espressif/esp_audio_codec:
+    path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_audio_codec"
+  espressif/cmake_utilities:
+    path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__cmake_utilities"
+  espressif/esp_wifi_remote:
+    version: ">=0.10,<2.0"
+    rules:
+      - if: "target in [esp32p4, esp32h2]"
+  espressif/esp_hosted:
+    version: "~2"
+    rules:
+      - if: "target in [esp32p4, esp32h2]"
+  espressif/esp-extconn:
+    version: "~0.3.0"
+    rules:
+      - if: "target in [esp32p4]"

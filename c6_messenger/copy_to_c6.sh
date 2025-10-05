@@ -16,7 +16,7 @@ fi
 echo "Copying C6 binaries to P4 flash bridge..."
 cp -v "$SRC_DIR/bootloader/bootloader.bin" "$DST_DIR/"
 cp -v "$SRC_DIR/c6_messenger.bin" "$DST_DIR/"
-cp -v "$SRC_DIR/partition_table/partition_table.bin" "$DST_DIR/"
+cp -v "$SRC_DIR/partition_table/partition-table.bin" "$DST_DIR/"
 
 echo "✓ C6 binaries copied successfully!"
 echo "  - bootloader.bin"

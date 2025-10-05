@@ -2,12 +2,16 @@
 #include "sdkconfig.h"
 #include "driver/uart.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include <string.h>
 
 static const char *TAG_UART = "coproc_uart";
 static TaskHandle_t s_rx_task = NULL;
 static bool s_uart_inited = false;
 static uart_port_t s_active_port = -1;
+static SemaphoreHandle_t s_c6_ready_sem = NULL;
+static bool s_c6_ready_flag = false;
 
 typedef struct {
     uart_port_t port;
@@ -52,11 +56,32 @@ static void coproc_uart_rx_task(void *arg)
             if (ch == '\n' || ch == '\r') {
                 if (n > 0) {
                     line[n] = 0;
+                    // Log all received lines
                     ESP_LOGI(TAG_UART, "C6[%s]: %s", cand ? cand->name : "cfg", line);
+
+                    // Detect C6_READY signal
+                    if (!s_c6_ready_flag && strstr(line, "C6_READY")) {
+                        s_c6_ready_flag = true;
+                        if (s_c6_ready_sem) {
+                            xSemaphoreGive(s_c6_ready_sem);
+                        }
+                        ESP_LOGI(TAG_UART, "🟢 C6_READY detected! C6 is ready for commands");
+                    }
+
+                    // Process C6 acknowledgments
+                    if (strstr(line, "C6_ACK") || strstr(line, "C6:")) {
+                        ESP_LOGI(TAG_UART, "✓ C6 acknowledged: %s", line);
+                    }
+
+                    // Set active port on first message
                     if (s_active_port < 0 && cand) {
                         s_active_port = port;
                         ESP_LOGI(TAG_UART, "Active UART set to %s (port %d)", cand->name, port);
                     }
+
+                    // TODO: Add callback mechanism here if needed
+                    // For now, all C6 messages are logged with "C6[u2]:" prefix
+
                     n = 0;
                 }
             } else if (n < sizeof(line) - 1) {
@@ -88,9 +113,14 @@ esp_err_t coproc_uart_init(void)
     const int tx_pin = CONFIG_COPROC_UART_TX_PIN;
     const int rx_pin = CONFIG_COPROC_UART_RX_PIN;
 
-    // Always ensure params/pins match the configured values even if a driver is already installed
-    if (uart_is_driver_installed(port)) {
-        ESP_LOGI(TAG_UART, "UART%d driver already installed, reconfiguring pins/params", port);
+    // CRITICAL: Follow ESP-IDF examples - install driver FIRST
+    // Order: 1) uart_driver_install, 2) uart_param_config, 3) uart_set_pin
+
+    if (!uart_is_driver_installed(port)) {
+        ESP_LOGI(TAG_UART, "Installing UART%d driver with RX=4096, TX=2048", port);
+        ESP_ERROR_CHECK(uart_driver_install(port, 4096, 2048, 0, NULL, 0));
+    } else {
+        ESP_LOGI(TAG_UART, "UART%d driver already installed", port);
     }
 
     uart_config_t cfg = {
@@ -111,18 +141,16 @@ esp_err_t coproc_uart_init(void)
                                  (rx_pin >= 0 ? rx_pin : UART_PIN_NO_CHANGE),
                                  UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 
-    // Large RX buffer for C6 logs to prevent blocking; TX buffer for sends
-    if (!uart_is_driver_installed(port)) {
-        ESP_LOGI(TAG_UART, "Installing UART%d driver with RX=4096, TX=2048", port);
-        ESP_ERROR_CHECK(uart_driver_install(port, 4096, 2048, 0, NULL, 0));
-    } else {
-        ESP_LOGI(TAG_UART, "UART%d driver already installed", port);
+    s_uart_inited = true;
+
+    // Create semaphore for C6_READY detection
+    if (!s_c6_ready_sem) {
+        s_c6_ready_sem = xSemaphoreCreateBinary();
+        if (!s_c6_ready_sem) {
+            ESP_LOGE(TAG_UART, "Failed to create C6_READY semaphore");
+        }
     }
 
-    // Clear any garbage in RX buffer
-    uart_flush_input(port);
-
-    s_uart_inited = true;
     ESP_LOGI(TAG_UART, "UART%d ready: TX=GPIO%d, RX=GPIO%d, baud=%d",
              port, tx_pin, rx_pin, CONFIG_COPROC_UART_BAUD);
     return ESP_OK;
@@ -148,28 +176,30 @@ esp_err_t coproc_uart_send_line(const char *line)
     size_t rx_bytes = 0;
     uart_get_buffered_data_len(port, &rx_bytes);
     if (rx_bytes > 0) {
-        ESP_LOGD(TAG_UART, "Flushing %d bytes from RX buffer before send", (int)rx_bytes);
+        // Log at INFO level to debug communication issues
+        ESP_LOGI(TAG_UART, "Note: Flushing %d bytes from RX buffer before send", (int)rx_bytes);
         uart_flush_input(port);
     }
 
-    // Compose with newline
+    // CRITICAL FIX: Clear TX FIFO before writing to ensure clean transmission
+    uart_wait_tx_done(port, pdMS_TO_TICKS(100));
+
+    // Compose message with newline
     char buf[256];
     size_t n = strnlen(line, sizeof(buf) - 2);
     memcpy(buf, line, n);
     buf[n++] = '\n';
 
-    // CRITICAL FIX: Flush TX FIFO before writing new data
-    uart_wait_tx_done(port, pdMS_TO_TICKS(100));
-
     // blocking write
-    ESP_LOGI(TAG_UART, "Sending %d bytes to UART%d: '%.*s'", (int)n, port, (int)(n-1), buf);
+    ESP_LOGI(TAG_UART, "TX→C6 [UART%d]: %.*s", port, (int)(n-1), buf);
     int w = uart_write_bytes(port, buf, n);
-    ESP_LOGI(TAG_UART, "uart_write_bytes returned: %d (expected %d)", w, (int)n);
 
     if (w == (int)n) {
         // Wait for TX to complete (ensures bytes are actually transmitted)
         esp_err_t wait_ret = uart_wait_tx_done(port, pdMS_TO_TICKS(1000));
-        ESP_LOGI(TAG_UART, "UART%d TX completed: %d bytes (wait_ret=%s)", port, w, esp_err_to_name(wait_ret));
+        if (wait_ret != ESP_OK) {
+            ESP_LOGW(TAG_UART, "TX wait_done timeout: %s", esp_err_to_name(wait_ret));
+        }
         return ESP_OK;
     }
     ESP_LOGW(TAG_UART, "UART%d write incomplete: %d/%d bytes", port, w, (int)n);
@@ -268,5 +298,34 @@ esp_err_t coproc_uart_force_uart2_log(void)
     }
     ESP_LOGI(TAG_UART, "Forced log on %s: UART%d TX=%d RX=%d @%d", c->name, c->port, c->tx_pin, c->rx_pin, baud);
     return ESP_OK;
+#endif
+}
+
+esp_err_t coproc_uart_wait_for_c6_ready(uint32_t timeout_ms)
+{
+#if !CONFIG_COPROC_UART_ENABLE
+    return ESP_ERR_INVALID_STATE;
+#else
+    // If already ready, return immediately
+    if (s_c6_ready_flag) {
+        ESP_LOGI(TAG_UART, "C6 already ready (fast path)");
+        return ESP_OK;
+    }
+
+    if (!s_c6_ready_sem) {
+        ESP_LOGE(TAG_UART, "C6_READY semaphore not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    ESP_LOGI(TAG_UART, "⏳ Waiting for C6_READY signal (timeout: %lu ms)...", timeout_ms);
+    TickType_t ticks = (timeout_ms == 0) ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms);
+
+    if (xSemaphoreTake(s_c6_ready_sem, ticks) == pdTRUE) {
+        ESP_LOGI(TAG_UART, "✅ C6_READY received! C6 is fully initialized");
+        return ESP_OK;
+    } else {
+        ESP_LOGW(TAG_UART, "⏰ Timeout waiting for C6_READY after %lu ms", timeout_ms);
+        return ESP_ERR_TIMEOUT;
+    }
 #endif
 }

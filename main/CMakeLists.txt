@@ -9,6 +9,7 @@ idf_component_register(
     "coproc_uart.c"
     "coproc_sdio.c"
     "c6_flash_bridge.c"
+    "telegram_photo.c"
   INCLUDE_DIRS "."
   REQUIRES
     esp_serial_slave_link
@@ -18,4 +19,5 @@ idf_component_register(
     esp_wifi
     esp_http_client
     mbedtls
+    esp_driver_jpeg
 )

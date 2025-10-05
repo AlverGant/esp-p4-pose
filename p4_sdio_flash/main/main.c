@@ -1,6 +1,7 @@
 /* P4-EYE -> C6 SDIO flashing (using esp-serial-flasher as component) */
 
 #include <string.h>
+#include <stdbool.h>
 #include "esp_err.h"
 #include "esp_log.h"
 #include "driver/uart.h"
@@ -9,6 +10,7 @@
 #include "esp_loader.h"
 #include "example_common.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "p4_sdio_flash";
 
@@ -28,17 +30,60 @@ void slave_monitor(void *arg)
 #endif
     };
 
+    // CRITICAL: Correct initialization order (follow ESP-IDF examples)
+    // 1) uart_driver_install, 2) uart_param_config, 3) uart_set_pin
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_2, BUF_LEN * 4, BUF_LEN * 4, 0, NULL, 0));
     ESP_ERROR_CHECK(uart_param_config(UART_NUM_2, &uart_config));
     // C6_U0TXD -> P4 GPIO36 (RX), C6_U0RXD -> P4 GPIO35 (TX)
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM_2, GPIO_NUM_35, GPIO_NUM_36,
                                  UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_2, BUF_LEN * 4, BUF_LEN * 4, 0, NULL, 0));
 
     ESP_LOGI(TAG, "UART2 monitor ready (GPIO35=TX, GPIO36=RX)");
 
+    bool c6_ready = false;
+    char line[128];
+    size_t n = 0;
+    int wait_cycles = 0;
+    int msg_count = 0;
+
     while (1) {
-        int rx = uart_read_bytes(UART_NUM_2, buf, BUF_LEN - 1, 100 / portTICK_PERIOD_MS);
-        if (rx > 0) { buf[rx] = '\0'; printf("%s", buf); }
+        int rx = uart_read_bytes(UART_NUM_2, buf, 1, 100 / portTICK_PERIOD_MS);
+        if (rx == 1) {
+            char ch = buf[0];
+            if (ch == '\n' || ch == '\r') {
+                if (n > 0) {
+                    line[n] = '\0';
+                    printf("%s\n", line);  // Print complete line
+
+                    // Detect C6_READY and start waiting
+                    if (!c6_ready && strstr(line, "C6_READY")) {
+                        ESP_LOGI(TAG, "✓ C6 is ready! Waiting 30s for WiFi/Telegram...");
+                        c6_ready = true;
+                        wait_cycles = 0;
+                    }
+                    n = 0;
+                }
+            } else if (n < sizeof(line) - 1) {
+                line[n++] = ch;
+            } else {
+                n = 0;  // overflow
+            }
+        }
+
+        // After C6_READY detected, send test message repeatedly (every 10s after initial 30s)
+        if (c6_ready) {
+            wait_cycles++;
+            // First message at 30s, then every 10s (100 cycles * 100ms = 10s)
+            if ((wait_cycles == 300) || (wait_cycles > 300 && (wait_cycles % 100) == 0)) {
+                msg_count++;
+                ESP_LOGI(TAG, "🧪 Sending FALL test #%d to C6 (testing cooldown behavior)...", msg_count);
+                const char *test_msg = "FALL P4→C6→Telegram repeated test\n";
+                uart_write_bytes(UART_NUM_2, test_msg, strlen(test_msg));
+                uart_wait_tx_done(UART_NUM_2, pdMS_TO_TICKS(1000));
+                ESP_LOGI(TAG, "📤 Test #%d sent (t=%ds). Observing C6 response and cooldown...",
+                         msg_count, wait_cycles / 10);
+            }
+        }
     }
 }
 
@@ -99,7 +144,8 @@ void app_main(void)
 
         vTaskDelay(500 / portTICK_PERIOD_MS);
         ESP_LOGI(TAG, "***** Target (C6) logs *****");
-        xTaskCreate(slave_monitor, "slave_monitor", 2048, NULL, configMAX_PRIORITIES - 1, NULL);
+        // CRITICAL FIX: Increase stack size to prevent overflow (was 2048, now 8192)
+        xTaskCreate(slave_monitor, "slave_monitor", 8192, NULL, configMAX_PRIORITIES - 1, NULL);
     }
     vTaskDelete(NULL);
 }

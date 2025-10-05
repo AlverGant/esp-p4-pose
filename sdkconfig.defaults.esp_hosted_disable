@@ -1,0 +1,2 @@
+# Disable ESP-Hosted to allow UART communication with C6
+CONFIG_ESP_HOSTED_ENABLED=n
