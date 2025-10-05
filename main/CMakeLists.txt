@@ -4,6 +4,7 @@ idf_component_register(
     "app_video.c"
     "app_video_utils.c"
     "pose_overlay.cpp"
+    "coco_pose.cpp"
     "net_telegram.c"
     "fall_notifier.c"
     "coproc_uart.c"

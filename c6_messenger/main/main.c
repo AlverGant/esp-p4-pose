@@ -21,7 +21,7 @@
 #include "driver/gpio.h"
 #include "esp_sntp.h"
 #include "esp_crt_bundle.h"
-#include "coproc_sdio_slave.h"
+// #include "coproc_sdio_slave.h"  // SDIO disabled - using UART only
 #include "hosted_alert_server.h"
 
 // Debug LED DISABLED - testing if GPIO8 conflicts with UART
@@ -47,15 +47,11 @@ static void uart_tx_line(const char *s)
 // Forward declaration
 esp_err_t telegram_send(const char *text);
 
-// Combined function that sends via SDIO and UART
+// Send response via UART only (SDIO disabled)
 static void send_response(const char *s)
 {
-    // Try SDIO first (only works with main P4 app, not p4_sdio_flash)
-    esp_err_t ret = coproc_sdio_slave_send_line(s);
-    if (ret != ESP_OK) {
-        // Fallback to UART if SDIO fails or not available
-        uart_tx_line(s);
-    }
+    // SDIO disabled - using UART only
+    uart_tx_line(s);
 }
 
 // Forward declarations
@@ -391,8 +387,6 @@ static void uart_reader_task(void *arg)
     // Logging to UART0 while reading from UART0 creates a feedback loop that causes lockup
 
     for (;;) {
-        int r = uart_read_bytes(uart_port, &ch, 1, pdMS_TO_TICKS(100));
-
         // Heartbeat: LED DISABLED for debugging
         if (++heartbeat >= 100) {  // 100 * 100ms = 10s
             led_state = !led_state;
@@ -400,8 +394,11 @@ static void uart_reader_task(void *arg)
             heartbeat = 0;
         }
 
-        if (r == 1) {
-            if (state == UART_STATE_TEXT) {
+        if (state == UART_STATE_TEXT) {
+            // TEXT MODE: Read byte-by-byte to find line endings
+            int r = uart_read_bytes(uart_port, &ch, 1, pdMS_TO_TICKS(100));
+
+            if (r == 1) {
                 // TEXT MODE: Read lines
                 if (ch == '\n' || ch == '\r') {
                     if (n > 0) {
@@ -412,7 +409,7 @@ static void uart_reader_task(void *arg)
                         if (strncmp(line, "PHOTO:", 6) == 0) {
                             // Parse photo size
                             photo_size = atoi(line + 6);
-                            if (photo_size > 0 && photo_size < 100000) {  // Max 100KB (C6 has limited RAM)
+                            if (photo_size > 0 && photo_size < 150000) {  // Max 150KB (increased from 100KB)
                                 // Allocate buffer for photo - C6 doesn't have SPIRAM, use internal RAM
                                 photo_buf = malloc(photo_size);
                                 if (photo_buf) {
@@ -443,12 +440,31 @@ static void uart_reader_task(void *arg)
                     // Overflow: reset silently
                     n = 0;
                 }
-            } else {
-                // BINARY MODE: Read photo data
-                photo_buf[photo_received++] = ch;
+            }
+        } else {
+                // BINARY MODE: Read photo data in chunks for faster transfer
+                // Read multiple bytes at once instead of byte-by-byte
+                size_t remaining = photo_size - photo_received;
+                size_t chunk_size = (remaining > 512) ? 512 : remaining;
+
+                // Read chunk from UART (non-blocking with timeout)
+                int bytes_read = uart_read_bytes(uart_port, photo_buf + photo_received, chunk_size, pdMS_TO_TICKS(1000));
+
+                if (bytes_read > 0) {
+                    photo_received += bytes_read;
+
+                    // Log progress every 2KB
+                    if (photo_received % 2048 == 0 || photo_received >= photo_size) {
+                        ESP_LOGI(TAG, "📥 Receiving photo: %u/%u bytes (%.1f%%)",
+                                 (unsigned)photo_received, (unsigned)photo_size,
+                                 100.0f * photo_received / photo_size);
+                    }
+                }
 
                 if (photo_received >= photo_size) {
                     // Photo complete - validate JPEG format
+                    ESP_LOGI(TAG, "✓ Photo transfer complete: %u bytes received", (unsigned)photo_size);
+
                     bool valid_jpeg = false;
                     if (photo_size >= 4) {
                         // Check JPEG magic bytes: starts with 0xFF 0xD8, ends with 0xFF 0xD9
@@ -456,16 +472,25 @@ static void uart_reader_task(void *arg)
                         bool valid_end = (photo_buf[photo_size-2] == 0xFF && photo_buf[photo_size-1] == 0xD9);
                         valid_jpeg = valid_start && valid_end;
 
-                        ESP_LOGI(TAG, "JPEG validation: start=%d end=%d (first bytes: %02X %02X, last bytes: %02X %02X)",
-                                 valid_start, valid_end,
+                        // Additional validation: check for reasonable JPEG structure
+                        int jpeg_markers = 0;
+                        for (size_t i = 0; i < photo_size - 1; i++) {
+                            if (photo_buf[i] == 0xFF && photo_buf[i+1] != 0x00 && photo_buf[i+1] != 0xFF) {
+                                jpeg_markers++;
+                            }
+                        }
+
+                        ESP_LOGI(TAG, "📸 JPEG validation: start=%d end=%d markers=%d (magic: %02X%02X...%02X%02X)",
+                                 valid_start, valid_end, jpeg_markers,
                                  photo_buf[0], photo_buf[1],
                                  photo_buf[photo_size-2], photo_buf[photo_size-1]);
                     }
 
                     if (!valid_jpeg) {
-                        ESP_LOGE(TAG, "Invalid JPEG data received!");
+                        ESP_LOGE(TAG, "❌ Invalid JPEG data received! Size: %u bytes", (unsigned)photo_size);
                         uart_tx_line("C6_PHOTO_ERR_INVALID");
                     } else {
+                        ESP_LOGI(TAG, "✓ Valid JPEG, uploading to Telegram...");
                         // Upload to Telegram (WITHOUT caption for now to debug)
                         esp_err_t ret = telegram_send_photo(photo_buf, photo_size, NULL);
 
@@ -483,7 +508,6 @@ static void uart_reader_task(void *arg)
                     photo_received = 0;
                     state = UART_STATE_TEXT;
                 }
-            }
         }
     }
 }
@@ -514,7 +538,8 @@ void app_main(void)
     };
 
     // Install driver first (correct order)
-    uart_driver_install(UART_NUM_0, 4096, 2048, 0, NULL, 0);
+    // Increased RX buffer from 4096 to 16384 for reliable photo reception
+    uart_driver_install(UART_NUM_0, 16384, 2048, 0, NULL, 0);
     uart_param_config(UART_NUM_0, &uart_cfg);
     uart_set_pin(UART_NUM_0, 16, 17, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 

@@ -348,30 +348,37 @@ bool app_video_has_control(int video_fd, uint32_t id)
 
 void app_video_apply_pose_tuning(int video_fd)
 {
-    // Try to set a slightly higher contrast, moderate saturation, some sharpness.
-    // If the driver doesn't support a control, we just log and continue.
+    // Optimized ISP settings for pose detection
+    // Tuned to enhance keypoint visibility and edge definition
+
+    // Contrast: enhanced to help model distinguish body parts
     if (app_video_has_control(video_fd, V4L2_CID_CONTRAST)) {
-        (void)app_video_set_control_normalized(video_fd, V4L2_CID_CONTRAST, 0.75f);
+        (void)app_video_set_control_normalized(video_fd, V4L2_CID_CONTRAST, 0.60f);
+        ESP_LOGI("app_video", "Set contrast to 0.60 for better pose detection");
     }
-    if (app_video_has_control(video_fd, V4L2_CID_SATURATION)) {
-        (void)app_video_set_control_normalized(video_fd, V4L2_CID_SATURATION, 0.60f);
-    }
+
+    // Sharpness: enhance edges for better keypoint detection
     if (app_video_has_control(video_fd, V4L2_CID_SHARPNESS)) {
-        (void)app_video_set_control_normalized(video_fd, V4L2_CID_SHARPNESS, 0.60f);
+        (void)app_video_set_control_normalized(video_fd, V4L2_CID_SHARPNESS, 0.65f);
+        ESP_LOGI("app_video", "Set sharpness to 0.65 for better edge detection");
     }
-    // Some drivers expose gamma; if available, set to a mild boost
+
+    // Saturation: moderate boost to help distinguish skin/clothing
+    if (app_video_has_control(video_fd, V4L2_CID_SATURATION)) {
+        (void)app_video_set_control_normalized(video_fd, V4L2_CID_SATURATION, 0.55f);
+        ESP_LOGI("app_video", "Set saturation to 0.55");
+    }
+
+    // Gamma: lower value for better shadow detail
     if (app_video_has_control(video_fd, V4L2_CID_GAMMA)) {
-        (void)app_video_set_control_normalized(video_fd, V4L2_CID_GAMMA, 0.60f);
+        (void)app_video_set_control_normalized(video_fd, V4L2_CID_GAMMA, 0.45f);
+        ESP_LOGI("app_video", "Set gamma to 0.45 for shadow detail");
     }
-    // Ensure auto exposure is on; some scenes benefit from slight bias up
+
+    // Ensure auto exposure is enabled
 #ifdef V4L2_CID_EXPOSURE_AUTO
     if (app_video_has_control(video_fd, V4L2_CID_EXPOSURE_AUTO)) {
-        (void)app_video_set_control(video_fd, V4L2_CID_EXPOSURE_AUTO, 1); // V4L2_EXPOSURE_AUTO
-    }
-#endif
-#ifdef V4L2_CID_AUTO_EXPOSURE_BIAS
-    if (app_video_has_control(video_fd, V4L2_CID_AUTO_EXPOSURE_BIAS)) {
-        (void)app_video_set_control_normalized(video_fd, V4L2_CID_AUTO_EXPOSURE_BIAS, 0.60f);
+        (void)app_video_set_control(video_fd, V4L2_CID_EXPOSURE_AUTO, 1);
     }
 #endif
 }

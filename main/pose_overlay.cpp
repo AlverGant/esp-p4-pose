@@ -280,7 +280,7 @@ esp_err_t pose_overlay_draw(uint16_t *rgb565_be_buf, int width, int height)
 
     for (const auto &r : s_last) {
         fall_person_count++;
-        // COCO keypoints: nose=0, left_hip=11, right_hip=12
+        // COCO keypoints: nose=0, left_hip=11, right_hip=12, left_shoulder=5, right_shoulder=6
         // Each keypoint has [x,y] so multiply index by 2
         auto unrotate_raw = [&](int x, int y) {
             int X = x, Y = y;
@@ -295,10 +295,14 @@ esp_err_t pose_overlay_draw(uint16_t *rgb565_be_buf, int width, int height)
         };
 
         // Read and unrotate only if valid
+        // IMPORTANT: (0,0) is INVALID - it means no detection!
         auto rd_kpt = [&](int idx, int &ox, int &oy, bool &valid) {
             int rx = r.keypoint[idx * 2];
             int ry = r.keypoint[idx * 2 + 1];
-            valid = (rx > 0 && ry > 0);
+            // Keypoint is valid if BOTH coordinates are > 0 (not at origin)
+            // AND within bounds
+            int Rw = s_width, Rh = s_height;
+            valid = (rx > 0 && ry > 0 && rx < Rw && ry < Rh);
             if (valid) {
                 auto p = unrotate_raw(rx, ry);
                 ox = p.first; oy = p.second;
@@ -308,9 +312,25 @@ esp_err_t pose_overlay_draw(uint16_t *rgb565_be_buf, int width, int height)
         int nose_x = 0, nose_y = 0; bool nose_valid = false;
         int left_hip_x = 0, left_hip_y = 0; bool lhip_valid = false;
         int right_hip_x = 0, right_hip_y = 0; bool rhip_valid = false;
+        int lshoulder_x = 0, lshoulder_y = 0; bool lshoulder_valid = false;
+        int rshoulder_x = 0, rshoulder_y = 0; bool rshoulder_valid = false;
+
         rd_kpt(0, nose_x, nose_y, nose_valid);
         rd_kpt(11, left_hip_x, left_hip_y, lhip_valid);
         rd_kpt(12, right_hip_x, right_hip_y, rhip_valid);
+        rd_kpt(5, lshoulder_x, lshoulder_y, lshoulder_valid);
+        rd_kpt(6, rshoulder_x, rshoulder_y, rshoulder_valid);
+
+        // Debug log for keypoint detection (only log first person)
+        if (fall_person_count == 1) {
+            ESP_LOGI("FALL", "Person %d keypoints: nose=%d,%d(%d) lhip=%d,%d(%d) rhip=%d,%d(%d) lsh=%d,%d(%d) rsh=%d,%d(%d)",
+                     fall_person_count,
+                     nose_x, nose_y, nose_valid,
+                     left_hip_x, left_hip_y, lhip_valid,
+                     right_hip_x, right_hip_y, rhip_valid,
+                     lshoulder_x, lshoulder_y, lshoulder_valid,
+                     rshoulder_x, rshoulder_y, rshoulder_valid);
+        }
 
         // Skip fall detection if key points are not properly detected
         // Need at least hips or shoulders to be detected reliably
@@ -430,14 +450,16 @@ esp_err_t pose_overlay_draw(uint16_t *rgb565_be_buf, int width, int height)
             float ar = (h > 1.0f) ? (w / h) : 999.0f;
             float min_dim = (float)std::min(s_width, s_height);
             // Relaxed bbox rule for low-keypoint cases: wide and relatively short
-            if (valid_kpts >= 4) {
-                if (ar >= 1.3f && h <= 0.38f * min_dim) {
+            if (valid_kpts >= 6) {
+                // Increased threshold from 4 to 6 to reduce false positives
+                if (ar >= 1.5f && h <= 0.35f * min_dim) {
                     fell_this_person = true;
-                    ESP_LOGW("FALL", "Person %d: POTENTIAL FALL! (bbox-std) w=%.1f h=%.1f ar=%.2f", fall_person_count, w, h, ar);
+                    ESP_LOGW("FALL", "Person %d: POTENTIAL FALL! (bbox-std) w=%.1f h=%.1f ar=%.2f kpts=%d", fall_person_count, w, h, ar, valid_kpts);
                 }
-            } else if (valid_kpts >= 2) {
-                // Very low-keypoints fallback: require even wider and short bbox
-                if (ar >= 1.5f && h <= 0.35f * min_dim && w >= 0.40f * min_dim) {
+            } else if (valid_kpts >= 5) {
+                // Increased threshold to reduce spurious detections (was 2, now 5)
+                // Low-keypoints fallback: require even wider and short bbox
+                if (ar >= 1.8f && h <= 0.30f * min_dim && w >= 0.45f * min_dim) {
                     fell_this_person = true;
                     ESP_LOGW("FALL", "Person %d: POTENTIAL FALL! (bbox-lowkp) w=%.1f h=%.1f ar=%.2f kpts=%d", fall_person_count, w, h, ar, valid_kpts);
                 }

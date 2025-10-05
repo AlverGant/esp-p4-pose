@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "c6_messenger",
-    "project_version":    "b40e65b-dirty",
+    "project_version":    "125c3c5-dirty",
     "project_path":       "/home/alvaro/Downloads/esp-p4-pose/c6_messenger",
     "idf_path":           "/home/alvaro/Downloads/esp-idf",
     "build_dir":          "/home/alvaro/Downloads/esp-p4-pose/c6_messenger/build",

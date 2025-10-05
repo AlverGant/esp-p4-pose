@@ -122,25 +122,46 @@ static esp_err_t fall_notifier_send_locked(const char *source_human,
 
 #if CONFIG_COPROC_UART_ENABLE
     {
-        // Capture and send photo via C6 to Telegram
+        // Capture and send photo via C6 to Telegram (LOCKS buffer!)
         int width = 0, height = 0;
         const uint16_t *frame = app_main_get_latest_frame(&width, &height);
 
         if (frame && width > 0 && height > 0) {
             ESP_LOGI(TAG_NOTIF, "📸 Capturando foto %dx%d para envio via C6", width, height);
 
-            // Build caption with event details
-            char caption[128];
-            snprintf(caption, sizeof(caption), "⚠️ %s (pessoas=%d, seq=%d)", label, persons, seq);
+            // CRITICAL: Make a complete copy WHILE buffer is locked!
+            size_t frame_size = width * height * sizeof(uint16_t);
+            uint16_t *frame_copy = heap_caps_malloc(frame_size, MALLOC_CAP_SPIRAM);
 
-            esp_err_t err_photo = telegram_send_photo_from_frame(frame, width, height, caption);
-            if (err_photo == ESP_OK) {
-                delivered = true;
-                last_err = ESP_OK;
-                ESP_LOGI(TAG_NOTIF, "✓ Foto enviada via UART para C6");
+            if (frame_copy) {
+                // Copy frame data while mutex is held
+                memcpy(frame_copy, frame, frame_size);
+
+                // Now safe to release mutex - we have our own copy
+                app_main_release_frame();
+
+                // Build caption with event details
+                char caption[128];
+                snprintf(caption, sizeof(caption), "⚠️ %s (pessoas=%d, seq=%d)", label, persons, seq);
+
+                // Process photo using our safe copy
+                esp_err_t err_photo = telegram_send_photo_from_frame(frame_copy, width, height, caption);
+
+                // Free our copy
+                free(frame_copy);
+
+                if (err_photo == ESP_OK) {
+                    delivered = true;
+                    last_err = ESP_OK;
+                    ESP_LOGI(TAG_NOTIF, "✓ Foto enviada via UART para C6");
+                } else {
+                    last_err = err_photo;
+                    ESP_LOGE(TAG_NOTIF, "✗ Falha ao enviar foto: %s", esp_err_to_name(err_photo));
+                }
             } else {
-                last_err = err_photo;
-                ESP_LOGE(TAG_NOTIF, "✗ Falha ao enviar foto: %s", esp_err_to_name(err_photo));
+                app_main_release_frame();  // Release even if copy failed
+                ESP_LOGE(TAG_NOTIF, "✗ Falha ao alocar buffer para cópia da foto");
+                last_err = ESP_ERR_NO_MEM;
             }
         } else {
             ESP_LOGW(TAG_NOTIF, "⚠️  Frame não disponível para foto - enviando texto");

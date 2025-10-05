@@ -4,6 +4,7 @@
 #include "nvs_flash.h"
 #include "esp_memory_utils.h"
 #include "esp_private/esp_cache_private.h"
+#include "esp_cache.h"
 
 #include "bsp/esp-bsp.h"
 #include "esp_lcd_panel_ops.h"
@@ -20,7 +21,7 @@
 #include "pose_overlay.h"
 #include "net_telegram.h"
 #include "coproc_uart.h"
-#include "coproc_sdio.h"
+// #include "coproc_sdio.h"  // SDIO disabled - using UART only
 #include "fall_notifier.h"
 #include "c6_flash_bridge.h"
 #include "driver/uart.h"
@@ -29,15 +30,19 @@ static const char *TAG = "app_main";
 
 #define FALL_DETECTION_LED_GPIO 23  // GPIO do LED no ESP32-P4-EYE (flashlight)
 // Resolution used for pose inference (decoupled from LCD resolution)
-// Tip: multiples of 32 tend to work best with s8 models. 416 gives better
-// detail at distance than 320, at the cost of more latency.
-#define POSE_INPUT_RES 640
+// Using 960x960 to match camera crop size (no additional scaling needed)
+// This eliminates one PPA scaling step and improves quality!
+// Expected inference time: ~6s on ESP32-P4 (vs ~3s for 640x640)
+#define POSE_INPUT_RES 960
 
 static esp_lcd_panel_handle_t s_panel = NULL;
 static size_t s_cache_align = 128; // default, will query later
 static uint8_t *s_canvas[EXAMPLE_CAM_BUF_NUM] = {0};
-static uint8_t *s_pose_buf = NULL; // RGB565 buffer (POSE_INPUT_RES x POSE_INPUT_RES)
+// Dual-buffer for pose: allows capturing new frames while inference is running
+static uint8_t *s_pose_buf[2] = {NULL, NULL};
+static volatile int s_pose_buf_idx = 0; // Alternates between 0 and 1
 static volatile int s_last_frame_idx = 0; // Track latest frame buffer for photo capture
+static SemaphoreHandle_t s_canvas_mutex = NULL; // Protect canvas buffer during photo capture
 /* no LVGL path: direct panel draw */
 
 static inline size_t align_up(size_t v, size_t a) { return (v + (a - 1)) & ~(a - 1); }
@@ -99,108 +104,81 @@ static void fall_test_btn_task(void *arg)
 
 static void frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index, uint32_t cam_w, uint32_t cam_h, size_t cam_len)
 {
+    // Quick mutex check - don't block camera pipeline
+    if (!s_canvas_mutex || xSemaphoreTake(s_canvas_mutex, 0) != pdTRUE) {
+        // Mutex locked (photo capture in progress), skip this frame
+        return;
+    }
+
     // Track latest frame for photo capture
     s_last_frame_idx = camera_buf_index;
 
     // Scale & center-crop to LCD size
     size_t out_sz = align_up(BSP_LCD_H_RES * BSP_LCD_V_RES * 2, s_cache_align);
 
-    // Clear entire canvas with solid black background (ensure complete clearing)
-    memset(s_canvas[camera_buf_index], 0, out_sz);
-
-    // Additional clearing for potential padding/alignment issues
-    size_t total_buffer_size = align_up(BSP_LCD_H_RES * BSP_LCD_V_RES * 2, s_cache_align);
-    if (total_buffer_size > out_sz) {
-        // Clear any additional aligned bytes
-        memset((uint8_t*)s_canvas[camera_buf_index] + out_sz, 0, total_buffer_size - out_sz);
-    }
-
-    // Crop camera to square maintaining aspect ratio, then scale to fill LCD
-    // Camera: 1280x720 (16:9) → crop to 720x720 (1:1) → scale to 480x480
-    uint32_t crop_size = cam_h; // Use camera height (720) as crop size - safe value
+    // Crop camera to square, then scale to LCD
+    // Camera: 1920x1080 → crop to 960x960 (center) → scale to 240x240 (LCD)
+    // Using 960x960 crop (same as factory_demo scale_level 1) for best quality/performance
+    uint32_t crop_size = 960;  // Match factory demo's proven crop size
 
     (void)app_image_process_scale_crop(
         camera_buf, cam_w, cam_h,
-        crop_size, crop_size,  // Square crop (720x720) from center of 1280x720
+        crop_size, crop_size,  // Square crop (960x960) from center of 1920x1080
         s_canvas[camera_buf_index], BSP_LCD_H_RES, BSP_LCD_V_RES, out_sz,
         PPA_SRM_ROTATION_ANGLE_0);
+
 
     // Swap to match LCD endianness if needed
     uint16_t *be_buf = (uint16_t *)s_canvas[camera_buf_index];
     swap_rgb565_bytes(be_buf, BSP_LCD_H_RES * BSP_LCD_V_RES);
 
     // Build dedicated pose input at fixed center crop (no ROI/zoom)
-    if (s_pose_buf) {
+    // Using dual-buffer: alternate between buffers to avoid blocking on inference
+    if (s_pose_buf[0] && s_pose_buf[1]) {
         size_t pose_out_sz = align_up(POSE_INPUT_RES * POSE_INPUT_RES * 2, s_cache_align);
-        static ppa_srm_rotation_angle_t s_pose_rot = PPA_SRM_ROTATION_ANGLE_0;
-        // Adaptive rotation: if seguidas inferências retornarem 0 pessoas, tente outra rotação
-        static int last_seq = -1;
-        static int zero_streak = 0;
-        int persons = 0, age_ms = 0, seq = -1;
-        pose_overlay_get_stats(&persons, &age_ms, &seq);
-        if (seq != last_seq && seq >= 0) {
-            if (persons <= 0) {
-                zero_streak++;
-            } else {
-                // If persons detected, revert to 0 deg after one confirmation
-                zero_streak = 0;
-                if (s_pose_rot != PPA_SRM_ROTATION_ANGLE_0) {
-                    s_pose_rot = PPA_SRM_ROTATION_ANGLE_0;
-                    pose_overlay_set_input_rotation(0);
-                    ESP_LOGI(TAG, "Persons detected; reverting pose input rotation to 0 deg");
-                }
-            }
-            last_seq = seq;
-            if (zero_streak >= 2) {
-                // Toggle only between 0 and 180 degrees
-                s_pose_rot = (s_pose_rot == PPA_SRM_ROTATION_ANGLE_0) ? PPA_SRM_ROTATION_ANGLE_180 : PPA_SRM_ROTATION_ANGLE_0;
-                int deg = (s_pose_rot == PPA_SRM_ROTATION_ANGLE_0) ? 0 : 180;
-                pose_overlay_set_input_rotation(deg);
-                ESP_LOGW(TAG, "No persons detected; rotating pose input to %d deg", deg);
-                zero_streak = 0;
-            }
-        }
+
+        // Alternate between the two pose buffers
+        s_pose_buf_idx = (s_pose_buf_idx + 1) % 2;
+        uint8_t *current_pose_buf = s_pose_buf[s_pose_buf_idx];
+
+        // Use same 960x960 crop for pose input for consistency
+        // Fixed 0° rotation (no adaptive rotation)
         (void)app_image_process_scale_crop(
             camera_buf, cam_w, cam_h,
-            crop_size, crop_size,
-            s_pose_buf, POSE_INPUT_RES, POSE_INPUT_RES, pose_out_sz,
-            s_pose_rot);
+            crop_size, crop_size,  // Uses same 960x960 crop as display
+            current_pose_buf, POSE_INPUT_RES, POSE_INPUT_RES, pose_out_sz,
+            PPA_SRM_ROTATION_ANGLE_0);
         // Pose expects big-endian RGB565 like LCD pipeline
-        swap_rgb565_bytes((uint16_t *)s_pose_buf, POSE_INPUT_RES * POSE_INPUT_RES);
-    }
+        swap_rgb565_bytes((uint16_t *)current_pose_buf, POSE_INPUT_RES * POSE_INPUT_RES);
 
-    // Submit frames to pose task on a time basis (not frame-count)
-    // v2 model has ~3s inference; we queue a fresh frame at ~1 Hz so
-    // the pose task always has a recent image without waiting for 45 frames.
-    static int64_t last_submit_us = 0;
-    int64_t now_us = esp_timer_get_time();
-    const int64_t min_period_us = 500000; // 0.5 second
-    if (now_us - last_submit_us >= min_period_us && s_pose_buf) {
-        esp_err_t q = pose_overlay_submit((uint16_t *)s_pose_buf, POSE_INPUT_RES, POSE_INPUT_RES);
-        if (q == ESP_OK) {
-            ESP_LOGI(TAG, "Submitting pose buffer %dx%d (queued)", POSE_INPUT_RES, POSE_INPUT_RES);
-        } else if (q == ESP_ERR_INVALID_STATE) {
-            // Staged while inference busy; avoid spamming logs
-            // ESP_LOGD(TAG, "Staged pose buffer %dx%d (busy)", POSE_INPUT_RES, POSE_INPUT_RES);
-        } else {
-            ESP_LOGW(TAG, "Pose submit failed (%d)", (int)q);
+        // Submit frames to pose task on a time basis
+        // Dual-buffer allows us to always submit fresh frames without blocking
+        static int64_t last_submit_us = 0;
+        int64_t now_us = esp_timer_get_time();
+        const int64_t min_period_us = 500000; // 0.5 second
+        if (now_us - last_submit_us >= min_period_us) {
+            esp_err_t q = pose_overlay_submit((uint16_t *)current_pose_buf, POSE_INPUT_RES, POSE_INPUT_RES);
+            if (q == ESP_OK) {
+                ESP_LOGI(TAG, "Submitting pose buffer %dx%d (queued, buf=%d)",
+                         POSE_INPUT_RES, POSE_INPUT_RES, s_pose_buf_idx);
+            } else if (q == ESP_ERR_INVALID_STATE) {
+                // Staged while inference busy - dual buffer will have fresh data next time
+                ESP_LOGD(TAG, "Staged pose buffer %dx%d (busy, buf=%d)",
+                         POSE_INPUT_RES, POSE_INPUT_RES, s_pose_buf_idx);
+            } else {
+                ESP_LOGW(TAG, "Pose submit failed (%d)", (int)q);
+            }
+            last_submit_us = now_us;
         }
-        last_submit_us = now_us;
     }
     (void)pose_overlay_draw(be_buf, BSP_LCD_H_RES, BSP_LCD_V_RES);
 
-    // Clean display borders even more thoroughly
-    // Clear bottom 16 pixels completely
-    for (int y = BSP_LCD_V_RES - 16; y < BSP_LCD_V_RES; y++) {
-        for (int x = 0; x < BSP_LCD_H_RES; x++) {
-            be_buf[y * BSP_LCD_H_RES + x] = 0;
-        }
-    }
-    // Clear right 16 pixels completely
-    for (int x = BSP_LCD_H_RES - 16; x < BSP_LCD_H_RES; x++) {
-        for (int y = 0; y < BSP_LCD_V_RES; y++) {
-            be_buf[y * BSP_LCD_H_RES + x] = 0;
-        }
+    // Border clearing removed - let image fill entire display
+    esp_lcd_panel_draw_bitmap(s_panel, 0, 0, BSP_LCD_H_RES, BSP_LCD_V_RES, be_buf);
+
+    // Release mutex after frame processing complete
+    if (s_canvas_mutex) {
+        xSemaphoreGive(s_canvas_mutex);
     }
 
     // LED control:
@@ -214,6 +192,8 @@ static void frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index, uint32_t cam
     bool fall = pose_overlay_is_fall_detected();
     int persons = 0, age_ms = 0, seq = 0;
     pose_overlay_get_stats(&persons, &age_ms, &seq);
+
+    int64_t now_us = esp_timer_get_time(); // Get current time for LED control
 
     if (fall) {
         if (!led_state) {
@@ -238,26 +218,43 @@ static void frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index, uint32_t cam
         }
         last_blink_us = now_us;
     }
-
-    // Draw full screen (end coords exclusive) — baseline working path
-    esp_lcd_panel_draw_bitmap(s_panel, 0, 0, BSP_LCD_H_RES, BSP_LCD_V_RES, s_canvas[camera_buf_index]);
+    // Draw already done above before mutex release
 }
 
 const uint16_t* app_main_get_latest_frame(int *width, int *height)
 {
-    // Return latest LCD frame for photo capture
-    if (!s_canvas[s_last_frame_idx]) {
+    // Lock mutex to prevent frame_cb from modifying buffer during photo capture
+    if (s_canvas_mutex && xSemaphoreTake(s_canvas_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGW(TAG, "Failed to lock canvas mutex for photo capture");
+        if (width) *width = 0;
+        if (height) *height = 0;
         return NULL;
     }
 
-    if (width) {
-        *width = BSP_LCD_H_RES;
-    }
-    if (height) {
-        *height = BSP_LCD_V_RES;
+    if (!s_canvas[s_last_frame_idx]) {
+        if (s_canvas_mutex) xSemaphoreGive(s_canvas_mutex);
+        if (width) *width = 0;
+        if (height) *height = 0;
+        return NULL;
     }
 
+    // Frame is already big-endian RGB565 after swap, ready for JPEG
+    if (width) *width = BSP_LCD_H_RES;
+    if (height) *height = BSP_LCD_V_RES;
+
+    ESP_LOGI(TAG, "Locked frame %d (%dx%d) for photo capture",
+             s_last_frame_idx, BSP_LCD_H_RES, BSP_LCD_V_RES);
+
+    // NOTE: Caller MUST call app_main_release_frame() after done!
     return (const uint16_t *)s_canvas[s_last_frame_idx];
+}
+
+void app_main_release_frame(void)
+{
+    if (s_canvas_mutex) {
+        xSemaphoreGive(s_canvas_mutex);
+        ESP_LOGD(TAG, "Released frame mutex");
+    }
 }
 
 void app_main(void)
@@ -430,6 +427,11 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, true));
     ESP_ERROR_CHECK(bsp_display_backlight_on());
 
+    // Create canvas mutex for photo capture protection
+    s_canvas_mutex = xSemaphoreCreateMutex();
+    ESP_ERROR_CHECK(s_canvas_mutex ? ESP_OK : ESP_ERR_NO_MEM);
+    ESP_LOGI(TAG, "Created canvas mutex for photo capture");
+
     // PPA (Pixel Processing Accelerator)
     ESP_LOGI(TAG, "Init PPA utils");
     ESP_ERROR_CHECK(app_video_utils_init());
@@ -469,10 +471,14 @@ void app_main(void)
         s_canvas[i] = heap_caps_aligned_calloc(s_cache_align, 1, canvas_sz, MALLOC_CAP_SPIRAM);
         ESP_ERROR_CHECK(s_canvas[i] ? ESP_OK : ESP_ERR_NO_MEM);
     }
+    // Allocate dual pose buffers for non-blocking frame capture during inference
     size_t pose_sz = align_up(POSE_INPUT_RES * POSE_INPUT_RES * 2, s_cache_align);
-    s_pose_buf = heap_caps_aligned_calloc(s_cache_align, 1, pose_sz, MALLOC_CAP_SPIRAM);
-    ESP_ERROR_CHECK(s_pose_buf ? ESP_OK : ESP_ERR_NO_MEM);
-    ESP_LOGI(TAG, "Allocated pose buffer %dx%d (%u bytes)", POSE_INPUT_RES, POSE_INPUT_RES, (unsigned)pose_sz);
+    for (int i = 0; i < 2; i++) {
+        s_pose_buf[i] = heap_caps_aligned_calloc(s_cache_align, 1, pose_sz, MALLOC_CAP_SPIRAM);
+        ESP_ERROR_CHECK(s_pose_buf[i] ? ESP_OK : ESP_ERR_NO_MEM);
+    }
+    ESP_LOGI(TAG, "Allocated dual pose buffers %dx%d (%u bytes each)",
+             POSE_INPUT_RES, POSE_INPUT_RES, (unsigned)pose_sz);
     ESP_ERROR_CHECK(app_video_main(i2c_handle));
     int cam_fd = app_video_open(EXAMPLE_CAM_DEV_PATH, APP_VIDEO_FMT);
     ESP_ERROR_CHECK_WITHOUT_ABORT((cam_fd >= 0) ? ESP_OK : ESP_FAIL);
@@ -480,6 +486,7 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to open camera");
         return;
     }
+    // Minimal tuning: only slight contrast boost for better pose detection
     app_video_apply_pose_tuning(cam_fd);
     ESP_ERROR_CHECK(app_video_set_bufs(cam_fd, EXAMPLE_CAM_BUF_NUM, NULL));
     ESP_ERROR_CHECK(app_video_register_frame_operation_cb(frame_cb));
