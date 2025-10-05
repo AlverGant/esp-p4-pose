@@ -156,23 +156,45 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
     ESP_LOGI(TAG, "Starting UART transfer: %u bytes total", (unsigned)jpeg_len);
 
     while (sent < jpeg_len) {
-        size_t to_send = (jpeg_len - sent) > chunk_size ? chunk_size : (jpeg_len - sent);
-        int written = uart_write_bytes(UART_NUM_2, (const char *)(jpeg_buf + sent), to_send);
+        size_t remaining_total = jpeg_len - sent;
+        size_t to_send = remaining_total > chunk_size ? chunk_size : remaining_total;
+        size_t chunk_sent = 0;
 
-        if (written < 0) {
-            ESP_LOGE(TAG, "UART write failed at offset %u/%u", (unsigned)sent, (unsigned)jpeg_len);
-            free(jpeg_buf);
-            jpeg_del_encoder_engine(encoder);
-            free(temp_frame);
-            return ESP_FAIL;
+        while (chunk_sent < to_send) {
+            int written = uart_write_bytes(UART_NUM_2,
+                                           (const char *)(jpeg_buf + sent + chunk_sent),
+                                           to_send - chunk_sent);
+
+            if (written < 0) {
+                ESP_LOGE(TAG, "UART write failed at offset %u/%u", (unsigned)(sent + chunk_sent),
+                         (unsigned)jpeg_len);
+                free(jpeg_buf);
+                jpeg_del_encoder_engine(encoder);
+                free(temp_frame);
+                return ESP_FAIL;
+            }
+
+            if (written == 0) {
+                ESP_LOGW(TAG, "UART write returned 0 bytes at offset=%u, retrying",
+                         (unsigned)(sent + chunk_sent));
+                vTaskDelay(pdMS_TO_TICKS(10));
+                continue;
+            }
+
+            if (written != (int)(to_send - chunk_sent)) {
+                ESP_LOGW(TAG,
+                         "Partial write: requested=%u, written=%d (chunk progress %u/%u, total offset=%u)",
+                         (unsigned)(to_send - chunk_sent),
+                         written,
+                         (unsigned)(chunk_sent + written),
+                         (unsigned)to_send,
+                         (unsigned)(sent + chunk_sent));
+            }
+
+            chunk_sent += written;
         }
 
-        if (written != to_send) {
-            ESP_LOGW(TAG, "Partial write: requested=%u, written=%d at offset=%u",
-                     (unsigned)to_send, written, (unsigned)sent);
-        }
-
-        sent += written;
+        sent += chunk_sent;
 
         // Log progress every 2KB
         if (sent % 2048 == 0 || sent == jpeg_len) {
@@ -180,9 +202,8 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
                      (unsigned)sent, (unsigned)jpeg_len, 100.0f * sent / jpeg_len);
         }
 
-        // Increased delay for more reliable transmission
         if (sent < jpeg_len) {
-            vTaskDelay(pdMS_TO_TICKS(30));  // Increased from 20 to 30ms
+            vTaskDelay(pdMS_TO_TICKS(30));
         }
     }
 
