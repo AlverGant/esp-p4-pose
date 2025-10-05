@@ -11,6 +11,7 @@
 #include "driver/jpeg_encode.h"
 #include "driver/uart.h"
 #include "bsp/esp-bsp.h"
+#include "esp_cache.h"
 #include <string.h>
 
 static const char *TAG = "tg_photo";
@@ -35,7 +36,7 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
     // CRITICAL: The LCD frame buffer has byte-swapped RGB565 (for LCD endianness)
     // but JPEG encoder expects normal RGB565. Create a temporary copy and reverse the swap.
     size_t frame_size = width * height * sizeof(uint16_t);
-    temp_frame = heap_caps_malloc(frame_size, MALLOC_CAP_SPIRAM);
+    temp_frame = heap_caps_malloc(frame_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA);
     if (!temp_frame) {
         ESP_LOGE(TAG, "Failed to allocate temporary frame buffer");
         return ESP_ERR_NO_MEM;
@@ -55,6 +56,12 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
     }
 
     swap_rgb565_bytes(temp_frame, width * height);  // Reverse the LCD byte-swap
+
+    // Ensure the DMA engine sees the updated RGB565 data in external RAM
+    esp_err_t cache_ret = esp_cache_msync(temp_frame, frame_size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+    if (cache_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Cache sync (C2M) failed: %s", esp_err_to_name(cache_ret));
+    }
     ESP_LOGI(TAG, "Created un-swapped RGB565 copy for JPEG encoding");
 
     // Create JPEG encoder
@@ -114,6 +121,12 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
         jpeg_del_encoder_engine(encoder);
         free(temp_frame);
         return ret;
+    }
+
+    // Invalidate cache to read fresh data produced by the JPEG encoder DMA
+    cache_ret = esp_cache_msync(jpeg_buf, jpeg_len, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+    if (cache_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Cache sync (M2C) failed: %s", esp_err_to_name(cache_ret));
     }
 
     // Validate JPEG output
