@@ -11,14 +11,13 @@
 #include "driver/jpeg_encode.h"
 #include "driver/uart.h"
 #include "bsp/esp-bsp.h"
-#include "esp_cache.h"
 #include <string.h>
 
 static const char *TAG = "tg_photo";
 
 // Protocol: "PHOTO:<size_bytes>\n" followed by binary JPEG data
 #define PHOTO_CMD_PREFIX "PHOTO:"
-#define PHOTO_QUALITY 90  // JPEG quality (0-100) - matching factory demo for best quality
+#define PHOTO_QUALITY 70  // JPEG quality (0-100) - reduced to fit C6 RAM for 960x960
 
 esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width, int height, const char *caption)
 {
@@ -36,7 +35,7 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
     // CRITICAL: The LCD frame buffer has byte-swapped RGB565 (for LCD endianness)
     // but JPEG encoder expects normal RGB565. Create a temporary copy and reverse the swap.
     size_t frame_size = width * height * sizeof(uint16_t);
-    temp_frame = heap_caps_malloc(frame_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA);
+    temp_frame = heap_caps_malloc(frame_size, MALLOC_CAP_SPIRAM);
     if (!temp_frame) {
         ESP_LOGE(TAG, "Failed to allocate temporary frame buffer");
         return ESP_ERR_NO_MEM;
@@ -56,12 +55,6 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
     }
 
     swap_rgb565_bytes(temp_frame, width * height);  // Reverse the LCD byte-swap
-
-    // Ensure the DMA engine sees the updated RGB565 data in external RAM
-    esp_err_t cache_ret = esp_cache_msync(temp_frame, frame_size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
-    if (cache_ret != ESP_OK) {
-        ESP_LOGW(TAG, "Cache sync (C2M) failed: %s", esp_err_to_name(cache_ret));
-    }
     ESP_LOGI(TAG, "Created un-swapped RGB565 copy for JPEG encoding");
 
     // Create JPEG encoder
@@ -78,7 +71,8 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
     }
 
     // Allocate output buffer for JPEG (increased for higher quality)
-    size_t jpeg_buf_size = width * height * 3 / 2;  // 1.5x raw size for safety with quality 75
+    // For 960x960: 1.5x = ~1.3MB, reduced to 1MB for quality 90 with YUV420
+    size_t jpeg_buf_size = width * height;  // 1.0x raw size is sufficient with YUV420 + quality 90
     jpeg_encode_memory_alloc_cfg_t mem_cfg = {
         .buffer_direction = JPEG_ENC_ALLOC_OUTPUT_BUFFER,
     };
@@ -123,12 +117,6 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
         return ret;
     }
 
-    // Invalidate cache to read fresh data produced by the JPEG encoder DMA
-    cache_ret = esp_cache_msync(jpeg_buf, jpeg_len, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
-    if (cache_ret != ESP_OK) {
-        ESP_LOGW(TAG, "Cache sync (M2C) failed: %s", esp_err_to_name(cache_ret));
-    }
-
     // Validate JPEG output
     bool valid_start = (jpeg_len >= 2 && jpeg_buf[0] == 0xFF && jpeg_buf[1] == 0xD8);
     bool valid_end = (jpeg_len >= 2 && jpeg_buf[jpeg_len-2] == 0xFF && jpeg_buf[jpeg_len-1] == 0xD9);
@@ -163,8 +151,8 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
     // Wait a bit for C6 to prepare
     vTaskDelay(pdMS_TO_TICKS(100));
 
-    // Send binary JPEG data in smaller chunks with verification
-    const size_t chunk_size = 256;  // Further reduced to 256 bytes for maximum reliability
+    // Send binary JPEG data in chunks - increased for faster 960x960 transfer
+    const size_t chunk_size = 512;  // 512 bytes for good balance of speed/reliability
     size_t sent = 0;
     ESP_LOGI(TAG, "Starting UART transfer: %u bytes total", (unsigned)jpeg_len);
 
@@ -209,14 +197,14 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
 
         sent += chunk_sent;
 
-        // Log progress every 2KB
-        if (sent % 2048 == 0 || sent == jpeg_len) {
+        // Log progress every 10KB
+        if (sent % 10240 == 0 || sent == jpeg_len) {
             ESP_LOGI(TAG, "UART TX progress: %u/%u bytes (%.1f%%)",
                      (unsigned)sent, (unsigned)jpeg_len, 100.0f * sent / jpeg_len);
         }
 
         if (sent < jpeg_len) {
-            vTaskDelay(pdMS_TO_TICKS(30));
+            vTaskDelay(pdMS_TO_TICKS(5));  // Reduced to 5ms with 460800 baud
         }
     }
 

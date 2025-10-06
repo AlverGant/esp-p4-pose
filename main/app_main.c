@@ -231,22 +231,24 @@ const uint16_t* app_main_get_latest_frame(int *width, int *height)
         return NULL;
     }
 
-    if (!s_canvas[s_last_frame_idx]) {
+    // Return high-res pose buffer (960x960) instead of LCD canvas (240x240)
+    // This gives 16x more pixels for much better photo quality
+    if (!s_pose_buf[s_pose_buf_idx]) {
         if (s_canvas_mutex) xSemaphoreGive(s_canvas_mutex);
         if (width) *width = 0;
         if (height) *height = 0;
         return NULL;
     }
 
-    // Frame is already big-endian RGB565 after swap, ready for JPEG
-    if (width) *width = BSP_LCD_H_RES;
-    if (height) *height = BSP_LCD_V_RES;
+    // Pose buffer is already big-endian RGB565 after swap, ready for JPEG
+    if (width) *width = POSE_INPUT_RES;
+    if (height) *height = POSE_INPUT_RES;
 
-    ESP_LOGI(TAG, "Locked frame %d (%dx%d) for photo capture",
-             s_last_frame_idx, BSP_LCD_H_RES, BSP_LCD_V_RES);
+    ESP_LOGI(TAG, "Locked pose buffer %d (%dx%d) for photo capture",
+             s_pose_buf_idx, POSE_INPUT_RES, POSE_INPUT_RES);
 
     // NOTE: Caller MUST call app_main_release_frame() after done!
-    return (const uint16_t *)s_canvas[s_last_frame_idx];
+    return (const uint16_t *)s_pose_buf[s_pose_buf_idx];
 }
 
 void app_main_release_frame(void)

@@ -409,7 +409,7 @@ static void uart_reader_task(void *arg)
                         if (strncmp(line, "PHOTO:", 6) == 0) {
                             // Parse photo size
                             photo_size = atoi(line + 6);
-                            if (photo_size > 0 && photo_size < 150000) {  // Max 150KB (increased from 100KB)
+                            if (photo_size > 0 && photo_size < 200000) {  // Max 200KB for 960x960 photos
                                 // Allocate buffer for photo - C6 doesn't have SPIRAM, use internal RAM
                                 photo_buf = malloc(photo_size);
                                 if (photo_buf) {
@@ -445,7 +445,7 @@ static void uart_reader_task(void *arg)
                 // BINARY MODE: Read photo data in chunks for faster transfer
                 // Read multiple bytes at once instead of byte-by-byte
                 size_t remaining = photo_size - photo_received;
-                size_t chunk_size = (remaining > 512) ? 512 : remaining;
+                size_t chunk_size = (remaining > 1024) ? 1024 : remaining;  // Increased to 1KB chunks
 
                 // Read chunk from UART (non-blocking with timeout)
                 int bytes_read = uart_read_bytes(uart_port, photo_buf + photo_received, chunk_size, pdMS_TO_TICKS(1000));
@@ -491,7 +491,7 @@ static void uart_reader_task(void *arg)
                         uart_tx_line("C6_PHOTO_ERR_INVALID");
                     } else {
                         ESP_LOGI(TAG, "✓ Valid JPEG, uploading to Telegram...");
-                        // Upload to Telegram (WITHOUT caption for now to debug)
+                        // Upload to Telegram (WITHOUT caption to save memory)
                         esp_err_t ret = telegram_send_photo(photo_buf, photo_size, NULL);
 
                         if (ret == ESP_OK) {
@@ -529,7 +529,7 @@ void app_main(void)
 
     // CRITICAL: Initialize UART0 FIRST before anything else
     uart_config_t uart_cfg = {
-        .baud_rate = 115200,
+        .baud_rate = 460800,  // 4x faster than 115200 for photo transfer
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
