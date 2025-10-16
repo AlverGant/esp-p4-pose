@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "p4_sdio_flash",
-    "project_version":    "ba85822-dirty",
+    "project_version":    "e9277c4-dirty",
     "project_path":       "/home/alvaro/Downloads/esp-p4-pose/p4_sdio_flash",
     "idf_path":           "/home/alvaro/Downloads/esp-idf",
     "build_dir":          "/home/alvaro/Downloads/esp-p4-pose/p4_sdio_flash/build",

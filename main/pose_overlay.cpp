@@ -5,11 +5,14 @@
 #include <math.h>
 #include <algorithm>
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 static const char *TAG_POSE = "pose";
 
 static COCOPose *s_pose = nullptr;
 static std::list<dl::detect::result_t> s_last;
+static SemaphoreHandle_t s_last_mutex = nullptr;  // Protects s_last from concurrent access
 static int s_width = 0, s_height = 0;
 static uint16_t *s_input = nullptr; // big-endian RGB565 snapshot
 static uint16_t *s_pending = nullptr; // staging buffer when inference is busy
@@ -91,13 +94,19 @@ static void pose_task(void *arg)
             ESP_LOGI("POSE", "inference start: %dx%d", img.width, img.height);
             s_inference_busy = true;
             auto &res = s_pose->run(img);
-            s_last = res;
+
+            // Update s_last with mutex protection to prevent race conditions with draw code
+            if (xSemaphoreTake(s_last_mutex, portMAX_DELAY) == pdTRUE) {
+                s_last = res;
+                xSemaphoreGive(s_last_mutex);
+            }
+
             int64_t t1 = esp_timer_get_time();
-            ESP_LOGI("POSE", "inference done in %.2fs, persons=%zu", (t1 - t0) / 1000000.0, s_last.size());
+            ESP_LOGI("POSE", "inference done in %.2fs, persons=%zu", (t1 - t0) / 1000000.0, res.size());
             s_inference_busy = false;
-            s_last_persons = (int)s_last.size();
+            s_last_persons = (int)res.size();
             s_last_infer_time_us = t1;
-            s_infer_seq++;
+            s_infer_seq = s_infer_seq + 1;
 
 
             // If a pending frame was staged during inference, promote it and trigger next run
@@ -147,6 +156,13 @@ esp_err_t pose_overlay_init(void)
     if (!s_sem) {
         s_sem = xSemaphoreCreateBinary();
     }
+    if (!s_last_mutex) {
+        s_last_mutex = xSemaphoreCreateMutex();
+        if (!s_last_mutex) {
+            ESP_LOGE(TAG_POSE, "Failed to create s_last mutex");
+            return ESP_ERR_NO_MEM;
+        }
+    }
     if (!s_task) {
         // Pin to core 1 (video stream on core 0), lower priority, bigger stack
         xTaskCreatePinnedToCore(pose_task, "pose_task", 12288, NULL, 2, &s_task, 1);
@@ -193,6 +209,17 @@ esp_err_t pose_overlay_draw(uint16_t *rgb565_be_buf, int width, int height)
     if (!rgb565_be_buf || width <= 0 || height <= 0) return ESP_ERR_INVALID_ARG;
     if (!s_ready) return ESP_OK;
 
+    // Make a local copy of s_last with mutex protection to avoid race conditions
+    std::list<dl::detect::result_t> local_results;
+    if (xSemaphoreTake(s_last_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        local_results = s_last;  // Copy the list
+        xSemaphoreGive(s_last_mutex);
+    } else {
+        // Could not acquire mutex in time, skip drawing this frame
+        ESP_LOGD(TAG_POSE, "Could not acquire mutex for drawing, skipping frame");
+        return ESP_OK;
+    }
+
     // Overlay skeleton on buffer (buffer is big-endian; write big-endian values)
     const uint16_t col_kpt = be16(rgb565(255, 0, 0));   // red for keypoints
 
@@ -208,8 +235,16 @@ esp_err_t pose_overlay_draw(uint16_t *rgb565_be_buf, int width, int height)
         be16(rgb565(255, 0, 255))  // magenta for person 3
     };
 
-    for (const auto &r : s_last) {
+    for (const auto &r : local_results) {
         if (person_count >= 3) break; // Limit to 3 persons for performance
+
+        // SAFETY: Check if keypoint vector has enough elements (17 keypoints * 2 coords = 34)
+        if (r.keypoint.size() < 34) {
+            ESP_LOGW(TAG_POSE, "Person %d: Skipping draw - invalid keypoint data (size=%zu)",
+                     person_count + 1, r.keypoint.size());
+            person_count++;
+            continue;
+        }
 
         uint16_t person_color = colors[person_count % 3];
 
@@ -278,8 +313,23 @@ esp_err_t pose_overlay_draw(uint16_t *rgb565_be_buf, int width, int height)
     int valid_detections = 0;
     int potential_falls = 0;
 
-    for (const auto &r : s_last) {
+    for (const auto &r : local_results) {
         fall_person_count++;
+
+        // SAFETY: Check if keypoint vector has enough elements (17 keypoints * 2 coords = 34)
+        const size_t kp_size = r.keypoint.size();
+        if (kp_size < 34) {
+            ESP_LOGW(TAG_POSE, "Person %d: SKIPPING - Invalid keypoint data (size=%zu, expected=34)",
+                     fall_person_count, kp_size);
+            continue;  // Skip this person entirely
+        }
+
+        // Additional safety: verify the vector has valid data pointer
+        if (r.keypoint.empty() || r.keypoint.data() == nullptr) {
+            ESP_LOGW(TAG_POSE, "Person %d: SKIPPING - Null keypoint data pointer", fall_person_count);
+            continue;
+        }
+
         // COCO keypoints: nose=0, left_hip=11, right_hip=12, left_shoulder=5, right_shoulder=6
         // Each keypoint has [x,y] so multiply index by 2
         auto unrotate_raw = [&](int x, int y) {
@@ -296,17 +346,44 @@ esp_err_t pose_overlay_draw(uint16_t *rgb565_be_buf, int width, int height)
 
         // Read and unrotate only if valid
         // IMPORTANT: (0,0) is INVALID - it means no detection!
-        auto rd_kpt = [&](int idx, int &ox, int &oy, bool &valid) {
-            int rx = r.keypoint[idx * 2];
-            int ry = r.keypoint[idx * 2 + 1];
+        auto rd_kpt = [&](int idx, int &ox, int &oy, bool &valid) -> void {
+            // Always initialize outputs to safe defaults
+            valid = false;
+            ox = 0;
+            oy = 0;
+
+            // Strict bounds checking - calculate required indices first
+            const size_t idx_x = static_cast<size_t>(idx * 2);
+            const size_t idx_y = static_cast<size_t>(idx * 2 + 1);
+            const size_t vec_size = r.keypoint.size();
+
+            // Return early if vector is too small (must have both x and y)
+            if (vec_size <= idx_y) {
+                ESP_LOGD(TAG_POSE, "rd_kpt: vector too small (size=%zu, need=%zu)", vec_size, idx_y + 1);
+                return;
+            }
+
+            // Verify data pointer is valid before accessing
+            if (r.keypoint.data() == nullptr) {
+                ESP_LOGW(TAG_POSE, "rd_kpt: null data pointer!");
+                return;
+            }
+
+            // Safe array access - indices are now verified to be in bounds
+            const int rx = r.keypoint[idx_x];
+            const int ry = r.keypoint[idx_y];
+
             // Keypoint is valid if BOTH coordinates are > 0 (not at origin)
             // AND within bounds
-            int Rw = s_width, Rh = s_height;
-            valid = (rx > 0 && ry > 0 && rx < Rw && ry < Rh);
-            if (valid) {
+            const int Rw = s_width;
+            const int Rh = s_height;
+
+            if (rx > 0 && ry > 0 && rx < Rw && ry < Rh) {
                 auto p = unrotate_raw(rx, ry);
-                ox = p.first; oy = p.second;
-            } else { ox = 0; oy = 0; }
+                ox = p.first;
+                oy = p.second;
+                valid = true;
+            }
         };
 
         int nose_x = 0, nose_y = 0; bool nose_valid = false;
@@ -349,6 +426,13 @@ esp_err_t pose_overlay_draw(uint16_t *rgb565_be_buf, int width, int height)
             valid_detections++;
             ESP_LOGI("FALL", "Person %d: nose(%d,%d) left_hip(%d,%d) right_hip(%d,%d)",
                      fall_person_count, nose_x, nose_y, left_hip_x, left_hip_y, right_hip_x, right_hip_y);
+        }
+
+        // SAFETY: Check if keypoint vector has enough elements before bbox calculation
+        if (r.keypoint.size() < 34) {
+            ESP_LOGW(TAG_POSE, "Person %d: Skipping bbox calculation - invalid keypoint data (size=%zu)",
+                     fall_person_count, r.keypoint.size());
+            continue;
         }
 
         // Compute bbox over available keypoints (for drawing/heuristics)
