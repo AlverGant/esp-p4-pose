@@ -1,10 +1,15 @@
 # Diretórios de build
 /build/
 /cmake-build-*/
+c6_messenger/build/
+p4_sdio_flash/build/
 
 # Arquivos de configuração locais
 sdkconfig
 sdkconfig.old
+sdkconfig.backup
+sdkconfig.bak*
+sdkconfig.before_fix
 CMakeCache.txt
 
 # Arquivos de dependências e lockfiles locais
@@ -14,12 +19,17 @@ __pycache__/
 *.swp
 *.swo
 
-# Saída de firmware
+# Saída de firmware (exceto resources/ que contém binários necessários para flash)
 *.elf
-*.bin
 *.map
 *.hex
 *.dump
+# Binários no diretório raiz dos subprojetos
+/c6_messenger/*.bin
+/p4_sdio_flash/*.bin
+
+# Arquivos PDF de documentação/esquemáticos grandes
+*.pdf
 
 # IDEs
 .vscode/
@@ -29,6 +39,7 @@ __pycache__/
 # Arquivos de backup
 *~
 *.bak
+*.backup
 *.orig
 
 # Outros arquivos temporários

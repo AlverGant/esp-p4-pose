@@ -1,126 +1,0 @@
-Command: /home/alvaro/.espressif/python_env/idf5.5_py3.12_env/bin/python /home/alvaro/Downloads/esp-idf/tools/idf_monitor.py -p /dev/ttyACM0 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 1 --decode-panic backtrace /home/alvaro/Downloads/esp-p4-pose/p4_sdio_flash/build/p4_sdio_flash.elf /home/alvaro/Downloads/esp-p4-pose/p4_sdio_flash/build/bootloader/bootloader.elf -m '/home/alvaro/.espressif/python_env/idf5.5_py3.12_env/bin/python' '/home/alvaro/Downloads/esp-idf/tools/idf.py' '-p' '/dev/ttyACM0'
-ESP-ROM:esp32p4-eco2-20240710
-Build:Jul 10 2024
-rst:0x17 (CHIP_USB_UART_RESET),boot:0x308 (SPI_FAST_FLASH_BOOT)
-Core0 Saved PC:0x4fc0424c
-Core1 Saved PC:0x4fc058dc
-SPI mode:DIO, clock div:1
-load:0x4ff33ce0,len:0x164c
-load:0x4ff29ed0,len:0xdfc
-load:0x4ff2cbd0,len:0x336c
-entry 0x4ff29eda
-[0;32mI (28) boot: ESP-IDF v5.5.1-255-g07e9bf4970-dirty 2nd stage bootloader[0m
-[0;32mI (29) boot: compile time Oct  6 2025 03:36:07[0m
-[0;32mI (29) boot: Multicore bootloader[0m
-[0;32mI (31) boot: chip revision: v1.3[0m
-[0;32mI (33) boot: efuse block revision: v0.3[0m
-[0;32mI (36) boot.esp32p4: SPI Speed      : 80MHz[0m
-[0;32mI (40) boot.esp32p4: SPI Mode       : DIO[0m
-[0;32mI (44) boot.esp32p4: SPI Flash Size : 16MB[0m
-[0;32mI (48) boot: Enabling RNG early entropy source...[0m
-[0;32mI (52) boot: Partition Table:[0m
-[0;32mI (55) boot: ## Label            Usage          Type ST Offset   Length[0m
-[0;32mI (61) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
-[0;32mI (68) boot:  1 phy_init         RF data          01 01 0000f000 00001000[0m
-[0;32mI (74) boot:  2 factory          factory app      00 00 00010000 00200000[0m
-[0;32mI (81) boot: End of partition table[0m
-[0;32mI (84) esp_image: segment 0: paddr=00010020 vaddr=48030020 size=1395cch (1283532) map[0m
-[0;32mI (271) esp_image: segment 1: paddr=001495f4 vaddr=30100000 size=00068h (   104) load[0m
-[0;32mI (273) esp_image: segment 2: paddr=00149664 vaddr=4ff00000 size=069b4h ( 27060) load[0m
-[0;32mI (280) esp_image: segment 3: paddr=00150020 vaddr=48000020 size=23060h (143456) map[0m
-[0;32mI (303) esp_image: segment 4: paddr=00173088 vaddr=4ff069b4 size=0d00ch ( 53260) load[0m
-[0;32mI (314) esp_image: segment 5: paddr=0018009c vaddr=4ff13a00 size=03088h ( 12424) load[0m
-[0;32mI (322) boot: Loaded app from partition at offset 0x10000[0m
-[0;32mI (322) boot: Disabling RNG early entropy source...[0m
-[0;32mI (335) hex_psram: vendor id    : 0x0d (AP)[0m
-[0;32mI (335) hex_psram: Latency      : 0x01 (Fixed)[0m
-[0;32mI (335) hex_psram: DriveStr.    : 0x00 (25 Ohm)[0m
-[0;32mI (336) hex_psram: dev id       : 0x03 (generation 4)[0m
-[0;32mI (340) hex_psram: density      : 0x07 (256 Mbit)[0m
-[0;32mI (345) hex_psram: good-die     : 0x06 (Pass)[0m
-[0;32mI (349) hex_psram: SRF          : 0x02 (Slow Refresh)[0m
-[0;32mI (354) hex_psram: BurstType    : 0x00 ( Wrap)[0m
-[0;32mI (358) hex_psram: BurstLen     : 0x03 (2048 Byte)[0m
-[0;32mI (362) hex_psram: BitMode      : 0x01 (X16 Mode)[0m
-[0;32mI (367) hex_psram: Readlatency  : 0x02 (10 cycles@Fixed)[0m
-[0;32mI (372) hex_psram: DriveStrength: 0x00 (1/1)[0m
-I esp_psram: Found 32MB PSRAM device
-I esp_psram: Speed: 20MHz
-[0;32mI (500) mmu_psram: .rodata xip on psram[0m
-[0;32mI (518) mmu_psram: .text xip on psram[0m
-[0;32mI (519) hex_psram: psram CS IO is dedicated[0m
-[0;32mI (520) cpu_start: Multicore app[0m
-[0;32mI (2499) esp_psram: SPI SRAM memory test OK[0m
-[0;32mI (2510) cpu_start: Pro cpu start user code[0m
-[0;32mI (2510) cpu_start: cpu freq: 360000000 Hz[0m
-[0;32mI (2511) app_init: Application information:[0m
-[0;32mI (2511) app_init: Project name:     p4_sdio_flash[0m
-[0;32mI (2515) app_init: App version:      e9277c4-dirty[0m
-[0;32mI (2519) app_init: Compile time:     Oct  6 2025 03:36:05[0m
-[0;32mI (2524) app_init: ELF file SHA256:  cfeb379bc...[0m
-[0;32mI (2529) app_init: ESP-IDF:          v5.5.1-255-g07e9bf4970-dirty[0m
-[0;32mI (2535) efuse_init: Min chip rev:     v0.1[0m
-[0;32mI (2539) efuse_init: Max chip rev:     v1.99 [0m
-[0;32mI (2543) efuse_init: Chip rev:         v1.3[0m
-[0;32mI (2547) heap_init: Initializing. RAM available for dynamic allocation:[0m
-[0;32mI (2553) heap_init: At 4FF18AA0 len 00022520 (137 KiB): RAM[0m
-[0;32mI (2558) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
-[0;32mI (2563) heap_init: At 4FF40000 len 00040000 (256 KiB): RAM[0m
-[0;32mI (2569) heap_init: At 50108080 len 00007F80 (31 KiB): RTCRAM[0m
-[0;32mI (2574) heap_init: At 30100068 len 00001F98 (7 KiB): TCM[0m
-[0;32mI (2579) esp_psram: Adding pool of 31296K of PSRAM memory to heap allocator[0m
-[0;32mI (2586) esp_psram: Adding pool of 51K of PSRAM memory gap generated due to end address alignment of irom to the heap allocator[0m
-[0;32mI (2598) esp_psram: Adding pool of 26K of PSRAM memory gap generated due to end address alignment of drom to the heap allocator[0m
-[0;32mI (2609) spi_flash: detected chip: generic[0m
-[0;32mI (2612) spi_flash: flash io: dio[0m
-[0;32mI (2616) main_task: Started on CPU0[0m
-[0;32mI (2626) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations[0m
-[0;32mI (2626) main_task: Calling app_main()[0m
-Connected to target
-[0;32mI (3436) p4_sdio_flash: Erasing entire flash (this may take a while)...[0m
-DEBUG: Error: FAILED_SPI_OP
-[0;33mW (3436) p4_sdio_flash: Flash erase failed: 9, continuing anyway[0m
-[0;32mI (3436) p4_sdio_flash: Loading bootloader...[0m
-Erasing flash (this may take a while)...
-Start programming
-Progress: 4 %Progress: 9 %Progress: 13 %Progress: 18 %Progress: 22 %Progress: 27 %Progress: 31 %Progress: 36 %Progress: 40 %Progress: 45 %Progress: 50 %Progress: 54 %Progress: 59 %Progress: 63 %Progress: 68 %Progress: 72 %Progress: 77 %Progress: 81 %Progress: 86 %Progress: 91 %Progress: 95 %Progress: 100 %
-Finished programming
-[0;32mI (3646) p4_sdio_flash: Loading partition table...[0m
-Erasing flash (this may take a while)...
-Start programming
-Progress: 33 %Progress: 66 %Progress: 100 %
-Finished programming
-[0;32mI (3696) p4_sdio_flash: Loading app...[0m
-Erasing flash (this may take a while)...
-Start programming
-Progress: 0 %Progress: 0 %Progress: 0 %Progress: 0 %Progress: 0 %Progress: 0 %Progress: 0 %Progress: 0 %Progress: 0 %Progress: 0 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 1 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 2 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 3 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 4 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 5 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 6 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 7 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 8 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 9 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 10 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 11 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 12 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 13 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 14 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 15 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 16 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 17 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 18 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 19 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 20 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 21 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 22 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 23 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 24 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 25 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 26 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 27 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 28 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 29 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 30 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 31 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 32 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 33 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 34 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 35 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 36 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 37 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 38 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 39 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 40 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 41 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 42 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 43 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 44 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 45 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 46 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 47 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 48 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 49 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 50 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 51 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 52 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 53 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 54 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 55 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 56 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 57 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 58 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 59 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 60 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 61 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 62 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 63 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 64 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 65 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 66 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 67 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 68 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 69 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 70 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 71 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 72 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 73 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 74 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 75 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 76 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 77 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 78 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 79 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 80 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 81 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 82 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 83 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 84 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 85 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 86 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 87 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 88 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 89 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 90 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 91 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 92 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 93 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 94 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 95 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 96 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 97 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 98 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 99 %Progress: 100 %
-Finished programming
-[0;32mI (9386) p4_sdio_flash: Done! Resetting target...[0m
-[0;32mI (9496) p4_sdio_flash: Ensuring C6 boots from flash (not download mode)...[0m
-[0;32mI (10196) p4_sdio_flash: ***** Target (C6) logs *****[0m
-[0;32mI (10196) p4_sdio_flash: UART2 monitor ready (GPIO35=TX, GPIO36=RX)[0m
-���������� 0c�0���� '1!	�
-�A1%1*!	�
-�� �,!�ԍP�9�� ���1� �$�!��--�����,(%�%ļ����	� � %���
-��-��0� � � !Q��,�(�P����	�%�����
-�Ɣ���	
-��������ǔ����!����)!��1$��!�$ 5%11%��!�$�%!�������1	�	%ԼK(1�7P��M)�!����K(!�� !�-��)���1!%51��K(!	
-#!�j1�
-�%!!�!�$�!$�>0K	�"1�%y���!��1�50B!C�- j(%
-%���!%! �14�5%��!����!1��
--% 05� ��)�)0%!!�%@B,)��4/!��,+�-% �%�$!��5!�,�$!P	�%(��)�5)!��-(	C
-�������!��Ʊ
-��� !�� ��
-1�5�!� ���� %���4%0!�%K	�� �!$�%��!050�Ƅ-���� � �1! %015�%5J-��
-��!�%�����-�@��1!0�5!�$%*(��%� %$ %���)	�� �!$%�	-0%!�
-	���Ʊ-��$	�	�!�%	��%!!�����!$��0K%�2��$%x� �!%%!%�
-5�,%
-�d�% %b!����.���
-�<!I�J�) ����% ����(
-�1�x� �!�%������)	��1-%x�[,	���-�C�%1B� �-��!��Ј!��	�! K��Ʊ-�����)%�$})%��1�	B
-*-!!� �0%���!P �% !��C�!%0!� ��)�
-��(�C�� �!	!5)�0���(� ��,�)0b		%p��)�	(0��%	�p1�51�!����0,% �
-(��55-�����1����J
-5��[! 1!%&�45-0��
-�1�-%���%!)��!���(%%�0�
-�!� �!�Ӭ51!1!	�(�  5�10 � �Α��110 ��� !
