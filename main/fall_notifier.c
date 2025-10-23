@@ -216,7 +216,6 @@ static void notifier_task(void *arg)
 {
     (void)arg;
     bool last_fall = false;
-    int heartbeat = 0;
 
     ESP_LOGI(TAG_NOTIF, "Fall notifier task started");
 
@@ -225,14 +224,10 @@ static void notifier_task(void *arg)
         int persons = 0, age_ms = 0, seq = 0;
         pose_overlay_get_stats(&persons, &age_ms, &seq);
 
-        // Debug heartbeat a cada 10 segundos
-        if (++heartbeat >= 40) {  // 40 * 250ms = 10s
-            ESP_LOGI(TAG_NOTIF, "Notifier alive: fall=%d persons=%d seq=%d", fall, persons, seq);
-            heartbeat = 0;
-        }
+        // Heartbeat removed - only log real events
 
         if (fall && !last_fall) {
-            ESP_LOGW(TAG_NOTIF, "*** QUEDA AUTOMÁTICA DETECTADA! Enviando notificação ***");
+            ESP_LOGW(TAG_NOTIF, "*** QUEDA DETECTADA! Enviando notificação ***");
             (void)fall_notifier_send_event("Queda detectada!", persons, age_ms, seq, false);
         }
         last_fall = fall;

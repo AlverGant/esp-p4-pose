@@ -47,11 +47,11 @@ dependencies:
     dependencies:
     - name: espressif/esp-dl
       override_path: ../../esp-dl
-      version: ^3.1.5
+      version: ~3.2.0
     source:
       path: /home/alvaro/Downloads/esp-dl/models/coco_pose
       type: local
-    version: 0.2.0
+    version: 0.3.0
   espressif/dl_fft:
     component_hash: 7dadbd644c0d7ba4733cc3726ec4cff6edf27b043725e1115861dec1609a3d28
     dependencies:
@@ -70,6 +70,8 @@ dependencies:
       version: ^0.6.1
     - name: espressif/dl_fft
       version: '>=0.3.1'
+    - name: espressif/esp-dsp
+      version: ==1.7.0
     source:
       path: /home/alvaro/Downloads/esp-dl/esp-dl
       type: local
@@ -77,7 +79,17 @@ dependencies:
     - esp32
     - esp32s3
     - esp32p4
-    version: 3.1.5
+    version: 3.2.0
+  espressif/esp-dsp:
+    component_hash: 42dce32d46ac93dc11f60d368e29a830e9661c7345d794b8a45c343479cae636
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.2'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.7.0
   espressif/esp_audio_codec:
     dependencies:
     - name: idf
@@ -216,6 +228,6 @@ direct_dependencies:
 - espressif/esp_video
 - espressif/knob
 - lvgl/lvgl
-manifest_hash: 646590c5e920dd9f9704274bf916737eb4279b6c4ab146246165700b20f2a71c
+manifest_hash: 555a326bfe5fbd731cadbf0be5465fb627bcc6dbde4e4ec03317190f446d66ab
 target: esp32p4
 version: 2.0.0

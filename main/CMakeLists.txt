@@ -4,7 +4,6 @@ idf_component_register(
     "app_video.c"
     "app_video_utils.c"
     "pose_overlay.cpp"
-    "coco_pose.cpp"
     "net_telegram.c"
     "fall_notifier.c"
     "coproc_uart.c"
@@ -13,6 +12,7 @@ idf_component_register(
     "telegram_photo.c"
   INCLUDE_DIRS "."
   REQUIRES
+    coco_pose
     esp_serial_slave_link
     nvs_flash
     esp_event

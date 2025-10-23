@@ -27,10 +27,9 @@ dependencies:
 
   # SDIO host helper removed (UART-only path)
 
-  # Pose estimation model (ESP-DL)
+  # Pose estimation model (ESP-DL) - using local esp-dl repository
   espressif/coco_pose:
-    version: "^0.2.0"
-    override_path: "/home/alvaro/Downloads/esp-dl/models/coco_pose"
+    path: "/home/alvaro/Downloads/esp-dl/models/coco_pose"
   espressif/esp_codec_dev:
     path: "/home/alvaro/Downloads/esp-dev-kits/examples/esp32-p4-eye/examples/factory_demo/managed_components/espressif__esp_codec_dev"
   espressif/esp_audio_codec:

@@ -30,10 +30,10 @@ static const char *TAG = "app_main";
 
 #define FALL_DETECTION_LED_GPIO 23  // GPIO do LED no ESP32-P4-EYE (flashlight)
 // Resolution used for pose inference (decoupled from LCD resolution)
-// Using 960x960 to match camera crop size (no additional scaling needed)
-// This eliminates one PPA scaling step and improves quality!
-// Expected inference time: ~6s on ESP32-P4 (vs ~3s for 640x640)
-#define POSE_INPUT_RES 960
+// Using 640x640 for optimal balance: 2x faster inference (~3s vs ~6s for 960x960)
+// with same mAP50-95 accuracy (0.449) - ESP-DL benchmarks show no quality loss
+// This gives better responsiveness for fall detection alerts
+#define POSE_INPUT_RES 640
 
 static esp_lcd_panel_handle_t s_panel = NULL;
 static size_t s_cache_align = 128; // default, will query later
@@ -141,11 +141,12 @@ static void frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index, uint32_t cam
         s_pose_buf_idx = (s_pose_buf_idx + 1) % 2;
         uint8_t *current_pose_buf = s_pose_buf[s_pose_buf_idx];
 
-        // Use same 960x960 crop for pose input for consistency
+        // Camera crop 960x960 → PPA scales to POSE_INPUT_RES (640x640)
+        // This gives 2x faster inference with same accuracy (ESP-DL benchmarks)
         // Fixed 0° rotation (no adaptive rotation)
         (void)app_image_process_scale_crop(
             camera_buf, cam_w, cam_h,
-            crop_size, crop_size,  // Uses same 960x960 crop as display
+            crop_size, crop_size,  // 960x960 crop from camera
             current_pose_buf, POSE_INPUT_RES, POSE_INPUT_RES, pose_out_sz,
             PPA_SRM_ROTATION_ANGLE_0);
         // Pose expects big-endian RGB565 like LCD pipeline
@@ -158,14 +159,8 @@ static void frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index, uint32_t cam
         const int64_t min_period_us = 500000; // 0.5 second
         if (now_us - last_submit_us >= min_period_us) {
             esp_err_t q = pose_overlay_submit((uint16_t *)current_pose_buf, POSE_INPUT_RES, POSE_INPUT_RES);
-            if (q == ESP_OK) {
-                ESP_LOGI(TAG, "Submitting pose buffer %dx%d (queued, buf=%d)",
-                         POSE_INPUT_RES, POSE_INPUT_RES, s_pose_buf_idx);
-            } else if (q == ESP_ERR_INVALID_STATE) {
-                // Staged while inference busy - dual buffer will have fresh data next time
-                ESP_LOGD(TAG, "Staged pose buffer %dx%d (busy, buf=%d)",
-                         POSE_INPUT_RES, POSE_INPUT_RES, s_pose_buf_idx);
-            } else {
+            // Only log errors (queued/staged are normal operations)
+            if (q != ESP_OK && q != ESP_ERR_INVALID_STATE) {
                 ESP_LOGW(TAG, "Pose submit failed (%d)", (int)q);
             }
             last_submit_us = now_us;

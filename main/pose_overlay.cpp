@@ -91,7 +91,6 @@ static void pose_task(void *arg)
 
             // Run inference with periodic watchdog resets
             int64_t t0 = esp_timer_get_time();
-            ESP_LOGI("POSE", "inference start: %dx%d", img.width, img.height);
             s_inference_busy = true;
             auto &res = s_pose->run(img);
 
@@ -102,7 +101,10 @@ static void pose_task(void *arg)
             }
 
             int64_t t1 = esp_timer_get_time();
-            ESP_LOGI("POSE", "inference done in %.2fs, persons=%zu", (t1 - t0) / 1000000.0, res.size());
+            // Log only on person count change or every 10th inference
+            if (s_last_persons != (int)res.size() || (s_infer_seq % 10) == 0) {
+                ESP_LOGI("POSE", "inference %.1fs, persons=%zu", (t1 - t0) / 1000000.0, res.size());
+            }
             s_inference_busy = false;
             s_last_persons = (int)res.size();
             s_last_infer_time_us = t1;
@@ -146,12 +148,15 @@ static void pose_task(void *arg)
 esp_err_t pose_overlay_init(void)
 {
     if (!s_pose) {
-        s_pose = new COCOPose();
+        // Using V2 model with QAT (Quantization-Aware Training)
+        // V2 provides +4.2% better mAP50-95 (0.449 vs 0.431) with same performance
+        // lazy_load = false forces immediate model load (detects errors early)
+        s_pose = new COCOPose(COCOPose::YOLO11N_POSE_S8_V2, false);
         if (!s_pose) {
             ESP_LOGE(TAG_POSE, "Failed to create COCOPose");
             return ESP_ERR_NO_MEM;
         }
-        ESP_LOGI(TAG_POSE, "Pose initialized");
+        ESP_LOGI(TAG_POSE, "Pose initialized (YOLO11n-Pose V2 with QAT, loaded immediately)");
     }
     if (!s_sem) {
         s_sem = xSemaphoreCreateBinary();

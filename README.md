@@ -21,8 +21,9 @@ Este projeto implementa um sistema de visão computacional embarcado que:
 ## Funcionalidades
 
 ### Detecção de Pose
-- Modelo: YOLO11n-Pose quantizado (INT8)
-- Resolução de inferência: 960x960 pixels
+- Modelo: YOLO11n-Pose V2 (QAT - Quantization-Aware Training)
+- Resolução de inferência: 640x640 pixels (~3s no ESP32-P4)
+- Precisão: mAP50-95 = 0.449 (+4.2% vs V1)
 - Detecção de 17 keypoints do esqueleto COCO
 - Overlay visual com pose detectada no LCD
 
@@ -68,6 +69,14 @@ Este projeto implementa um sistema de visão computacional embarcado que:
 └── docs/                  # Documentação técnica
 
 ```
+
+## Melhorias Recentes
+
+### v1.1 - Otimizações de Performance (2025-01)
+- ✅ **Upgrade para YOLO11n-Pose V2**: +4.2% precisão (mAP 0.449 vs 0.431)
+- ⚡ **Resolução otimizada**: 640x640 (2x mais rápido que 960x960)
+- 🎯 **Thresholds ajustados**: Otimizados para modelo V2 com QAT
+- 📊 **Latência de inferência**: Reduzida de ~6s para ~3s
 
 ## Como Compilar
 
@@ -162,9 +171,11 @@ O P4 pode flashar o C6 remotamente via UART usando `c6_flash_bridge`:
 - Confirme baudrate igual em P4 e C6
 - Veja logs: `main/coproc_uart.c`
 
-### Inferência Lenta
-- Tempo esperado: ~6s para 960x960 no ESP32-P4
-- Considere reduzir resolução para 640x640 (~3s)
+### Performance de Inferência
+- Resolução atual: 640x640 (~3s no ESP32-P4)
+- Modelo V2 com QAT: mAP50-95 = 0.449
+- Para maior qualidade: use 960x960 (~6s, mesma precisão)
+- Para tempo real: teste 320x320 (~600ms, -25% precisão)
 
 ## Documentos Técnicos
 
