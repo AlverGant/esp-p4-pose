@@ -403,6 +403,20 @@ esp_err_t pose_overlay_draw(uint16_t *rgb565_be_buf, int width, int height)
         rd_kpt(5, lshoulder_x, lshoulder_y, lshoulder_valid);
         rd_kpt(6, rshoulder_x, rshoulder_y, rshoulder_valid);
 
+        // Quick scan: count valid keypoints to filter out empty detections (all zero)
+        int valid_kpts = 0;
+        for (int k = 0; k < 17; ++k) {
+            int rx = r.keypoint[2 * k];
+            int ry = r.keypoint[2 * k + 1];
+            if (rx > 0 && ry > 0 && rx < s_width && ry < s_height) {
+                valid_kpts++;
+            }
+        }
+        if (valid_kpts < 4) {
+            ESP_LOGI("FALL", "Person %d: skipping - only %d/17 keypoints valid", fall_person_count, valid_kpts);
+            continue;
+        }
+
         // Debug log for keypoint detection (only log first person)
         if (fall_person_count == 1) {
             ESP_LOGI("FALL", "Person %d keypoints: nose=%d,%d(%d) lhip=%d,%d(%d) rhip=%d,%d(%d) lsh=%d,%d(%d) rsh=%d,%d(%d)",
@@ -426,11 +440,19 @@ esp_err_t pose_overlay_draw(uint16_t *rgb565_be_buf, int width, int height)
         rd_kpt(6, right_shoulder_x, right_shoulder_y, rsho_valid);
         shoulders_detected = (lsho_valid && rsho_valid);
 
+        // NEW: Also accept single-side detection (hip + shoulder on same side)
+        bool left_side_detected = (lhip_valid && lsho_valid);
+        bool right_side_detected = (rhip_valid && rsho_valid);
+        bool single_side_detected = (left_side_detected || right_side_detected);
+
         // Only log and process if we have reliable keypoints
-        if (hips_detected || shoulders_detected) {
+        if (hips_detected || shoulders_detected || single_side_detected) {
             valid_detections++;
-            ESP_LOGI("FALL", "Person %d: nose(%d,%d) left_hip(%d,%d) right_hip(%d,%d)",
-                     fall_person_count, nose_x, nose_y, left_hip_x, left_hip_y, right_hip_x, right_hip_y);
+            ESP_LOGI("FALL", "Person %d: nose(%d,%d) lhip(%d,%d) rhip(%d,%d) lsh(%d,%d) rsh(%d,%d) [hips=%d sh=%d Lside=%d Rside=%d]",
+                     fall_person_count, nose_x, nose_y,
+                     left_hip_x, left_hip_y, right_hip_x, right_hip_y,
+                     left_shoulder_x, left_shoulder_y, right_shoulder_x, right_shoulder_y,
+                     hips_detected, shoulders_detected, left_side_detected, right_side_detected);
         }
 
         // SAFETY: Check if keypoint vector has enough elements before bbox calculation
@@ -442,7 +464,7 @@ esp_err_t pose_overlay_draw(uint16_t *rgb565_be_buf, int width, int height)
 
         // Compute bbox over available keypoints (for drawing/heuristics)
         int bb_min_x = s_width, bb_min_y = s_height, bb_max_x = 0, bb_max_y = 0;
-        int valid_kpts = 0;
+        valid_kpts = 0;
         for (int k = 0; k < 17; ++k) {
             int rx = r.keypoint[2 * k];
             int ry = r.keypoint[2 * k + 1];
@@ -527,6 +549,42 @@ esp_err_t pose_overlay_draw(uint16_t *rgb565_be_buf, int width, int height)
                 if (hip_dx >= (int)(0.28f * min_dim) && hip_dy <= (int)(0.07f * min_dim)) {
                     fell_this_person = true;
                     ESP_LOGW("FALL", "Person %d: POTENTIAL FALL! (hips-only) hip_dx=%d hip_dy=%d", fall_person_count, hip_dx, hip_dy);
+                }
+            }
+        } else if (single_side_detected) {
+            // NEW: Single-side fall detection (hip + shoulder on same side only)
+            int side_hip_x = 0, side_hip_y = 0;
+            int side_shoulder_x = 0, side_shoulder_y = 0;
+
+            if (right_side_detected) {
+                side_hip_x = right_hip_x;
+                side_hip_y = right_hip_y;
+                side_shoulder_x = right_shoulder_x;
+                side_shoulder_y = right_shoulder_y;
+            } else {
+                side_hip_x = left_hip_x;
+                side_hip_y = left_hip_y;
+                side_shoulder_x = left_shoulder_x;
+                side_shoulder_y = left_shoulder_y;
+            }
+
+            int dy = (side_hip_y - side_shoulder_y);
+            int dx = (side_hip_x - side_shoulder_x);
+            float v = fabsf((float)dy);
+            float h = fabsf((float)dx);
+            float angle_deg = atan2f(h, v) * 57.2958f; // 0 = vertical, 90 = horizontal
+            float torso_len = sqrtf(h * h + v * v);
+            float min_dim = (float)std::min(s_width, s_height);
+            float min_torso_len = 0.06f * min_dim;
+
+            if (torso_len >= min_torso_len) {
+                if (angle_deg >= 45.0f) {  // Slightly stricter for single-side
+                    fell_this_person = true;
+                    ESP_LOGW("FALL", "Person %d: POTENTIAL FALL! (single-side %s) angle=%.1f len=%.1f",
+                             fall_person_count, right_side_detected ? "R" : "L", angle_deg, torso_len);
+                } else {
+                    ESP_LOGI("FALL", "Person %d: Single-side upright angle=%.1f len=%.1f",
+                             fall_person_count, angle_deg, torso_len);
                 }
             }
         }
