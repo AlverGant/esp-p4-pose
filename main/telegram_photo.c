@@ -1,23 +1,28 @@
 /**
  * Telegram Photo Support
- * Captures frame and sends to C6 for Telegram upload
+ * Captures frame and sends to C6 for Telegram upload via ESP-AT
  */
 
 #include "telegram_photo.h"
 #include "app_video_utils.h"  // for swap_rgb565_bytes()
 #include "esp_log.h"
 #include "esp_heap_caps.h"
+#include "esp_cache.h"  // for cache sync before JPEG DMA
 #include "coproc_uart.h"
 #include "driver/jpeg_encode.h"
 #include "driver/uart.h"
 #include "bsp/esp-bsp.h"
+#include "sdkconfig.h"
 #include <string.h>
+
+#if CONFIG_AT_TELEGRAM_VIA_C6
+#include "at_http.h"
+#endif
 
 static const char *TAG = "tg_photo";
 
-// Protocol: "PHOTO:<size_bytes>\n" followed by binary JPEG data
-#define PHOTO_CMD_PREFIX "PHOTO:"
-#define PHOTO_QUALITY 70  // JPEG quality (0-100) - reduced to fit C6 RAM for 960x960
+#define PHOTO_QUALITY 85  // JPEG quality (0-100) - higher quality reduces artifacts in dark areas
+#define CACHE_ALIGN 128
 
 esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width, int height, const char *caption)
 {
@@ -34,8 +39,10 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
 
     // CRITICAL: The LCD frame buffer has byte-swapped RGB565 (for LCD endianness)
     // but JPEG encoder expects normal RGB565. Create a temporary copy and reverse the swap.
+    // Buffer MUST be cache-line aligned (128 bytes for ESP32-P4) for esp_cache_msync!
     size_t frame_size = width * height * sizeof(uint16_t);
-    temp_frame = heap_caps_malloc(frame_size, MALLOC_CAP_SPIRAM);
+    size_t aligned_size = (frame_size + 127) & ~127;  // Round up to 128-byte boundary
+    temp_frame = heap_caps_aligned_alloc(128, aligned_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA);
     if (!temp_frame) {
         ESP_LOGE(TAG, "Failed to allocate temporary frame buffer");
         return ESP_ERR_NO_MEM;
@@ -55,7 +62,17 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
     }
 
     swap_rgb565_bytes(temp_frame, width * height);  // Reverse the LCD byte-swap
-    ESP_LOGI(TAG, "Created un-swapped RGB565 copy for JPEG encoding");
+
+    // CRITICAL: Sync CPU cache to PSRAM before JPEG encoder DMA reads!
+    // The JPEG encoder uses DMA which reads from PSRAM directly, bypassing CPU cache.
+    // Without this sync, DMA may read stale data causing horizontal banding artifacts.
+    // Must use aligned_size to sync the entire cache-aligned region!
+    esp_err_t cache_ret = esp_cache_msync(temp_frame, aligned_size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+    if (cache_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Cache sync failed: %s", esp_err_to_name(cache_ret));
+    }
+
+    ESP_LOGI(TAG, "Created un-swapped RGB565 copy for JPEG encoding (cache synced)");
 
     // Create JPEG encoder
     jpeg_encode_engine_cfg_t encode_eng_cfg = {
@@ -73,11 +90,9 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
     // Allocate output buffer for JPEG (increased for higher quality)
     // For 960x960: 1.5x = ~1.3MB, reduced to 1MB for quality 90 with YUV420
     size_t jpeg_buf_size = width * height;  // 1.0x raw size is sufficient with YUV420 + quality 90
-    jpeg_encode_memory_alloc_cfg_t mem_cfg = {
-        .buffer_direction = JPEG_ENC_ALLOC_OUTPUT_BUFFER,
-    };
-    size_t allocated_size = 0;
-    jpeg_buf = jpeg_alloc_encoder_mem(jpeg_buf_size, &mem_cfg, &allocated_size);
+    // Allocate JPEG output buffer in internal DMA-capable RAM to avoid PSRAM DMA issues
+    size_t allocated_size = jpeg_buf_size;
+    jpeg_buf = heap_caps_aligned_alloc(CACHE_ALIGN, allocated_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
 
     if (!jpeg_buf) {
         ESP_LOGE(TAG, "Failed to allocate JPEG buffer");
@@ -86,7 +101,11 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
         return ESP_ERR_NO_MEM;
     }
 
-    ESP_LOGI(TAG, "Allocated JPEG buffer: %u bytes", (unsigned)allocated_size);
+    ESP_LOGI(TAG, "Allocated JPEG buffer: %u bytes (internal DMA)", (unsigned)allocated_size);
+
+    // Invalidate output buffer cache before DMA writes into it
+    size_t pre_sync_len = (allocated_size + (CACHE_ALIGN - 1)) & ~(CACHE_ALIGN - 1);
+    esp_cache_msync(jpeg_buf, pre_sync_len, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
 
     // Configure JPEG encoding (matching factory demo settings)
     jpeg_encode_cfg_t enc_cfg = {
@@ -99,131 +118,102 @@ esp_err_t telegram_send_photo_from_frame(const uint16_t *rgb565_frame, int width
 
     // Encode using the un-swapped temporary frame
     uint32_t jpeg_len = 0;
-    ret = jpeg_encoder_process(
-        encoder,
-        &enc_cfg,
-        (const uint8_t *)temp_frame,  // Use un-swapped frame!
-        width * height * 2,  // RGB565 = 2 bytes per pixel
-        jpeg_buf,
-        allocated_size,
-        &jpeg_len
-    );
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        jpeg_len = 0;
+        ret = jpeg_encoder_process(
+            encoder,
+            &enc_cfg,
+            (const uint8_t *)temp_frame,  // Use un-swapped frame!
+            width * height * 2,  // RGB565 = 2 bytes per pixel
+            jpeg_buf,
+            allocated_size,
+            &jpeg_len
+        );
 
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "JPEG encode failed: %s", esp_err_to_name(ret));
-        free(jpeg_buf);
-        jpeg_del_encoder_engine(encoder);
-        free(temp_frame);
-        return ret;
-    }
-
-    // Validate JPEG output
-    bool valid_start = (jpeg_len >= 2 && jpeg_buf[0] == 0xFF && jpeg_buf[1] == 0xD8);
-    bool valid_end = (jpeg_len >= 2 && jpeg_buf[jpeg_len-2] == 0xFF && jpeg_buf[jpeg_len-1] == 0xD9);
-
-    ESP_LOGI(TAG, "JPEG encoded: %u bytes (compression: %.1f%%), valid: start=%d end=%d",
-             (unsigned)jpeg_len, 100.0f * jpeg_len / (width * height * 2),
-             valid_start, valid_end);
-
-    if (!valid_start || !valid_end) {
-        ESP_LOGE(TAG, "⚠️ JPEG encoding produced invalid output!");
-        free(jpeg_buf);
-        jpeg_del_encoder_engine(encoder);
-        free(temp_frame);
-        return ESP_FAIL;
-    }
-
-    // Send photo command to C6 via UART
-    // NOTE: coproc_uart_send_line() adds '\n' automatically, so don't add it here!
-    char cmd[64];
-    snprintf(cmd, sizeof(cmd), "%s%u", PHOTO_CMD_PREFIX, (unsigned)jpeg_len);
-
-    ESP_LOGI(TAG, "Sending photo to C6 (%u bytes)...", (unsigned)jpeg_len);
-    ret = coproc_uart_send_line(cmd);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to send photo command");
-        free(jpeg_buf);
-        jpeg_del_encoder_engine(encoder);
-        free(temp_frame);
-        return ret;
-    }
-
-    // Wait a bit for C6 to prepare
-    vTaskDelay(pdMS_TO_TICKS(100));
-
-    // Send binary JPEG data in chunks - increased for faster 960x960 transfer
-    const size_t chunk_size = 512;  // 512 bytes for good balance of speed/reliability
-    size_t sent = 0;
-    ESP_LOGI(TAG, "Starting UART transfer: %u bytes total", (unsigned)jpeg_len);
-
-    while (sent < jpeg_len) {
-        size_t remaining_total = jpeg_len - sent;
-        size_t to_send = remaining_total > chunk_size ? chunk_size : remaining_total;
-        size_t chunk_sent = 0;
-
-        while (chunk_sent < to_send) {
-            int written = uart_write_bytes(UART_NUM_2,
-                                           (const char *)(jpeg_buf + sent + chunk_sent),
-                                           to_send - chunk_sent);
-
-            if (written < 0) {
-                ESP_LOGE(TAG, "UART write failed at offset %u/%u", (unsigned)(sent + chunk_sent),
-                         (unsigned)jpeg_len);
-                free(jpeg_buf);
-                jpeg_del_encoder_engine(encoder);
-                free(temp_frame);
-                return ESP_FAIL;
-            }
-
-            if (written == 0) {
-                ESP_LOGW(TAG, "UART write returned 0 bytes at offset=%u, retrying",
-                         (unsigned)(sent + chunk_sent));
-                vTaskDelay(pdMS_TO_TICKS(10));
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "JPEG encode failed (try %d): %s", attempt + 1, esp_err_to_name(ret));
+            if (attempt == 0) {
+                // Retry once after clearing buffer and resyncing cache
+                memset(jpeg_buf, 0, allocated_size);
+                esp_cache_msync(jpeg_buf, allocated_size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
                 continue;
             }
-
-            if (written != (int)(to_send - chunk_sent)) {
-                ESP_LOGW(TAG,
-                         "Partial write: requested=%u, written=%d (chunk progress %u/%u, total offset=%u)",
-                         (unsigned)(to_send - chunk_sent),
-                         written,
-                         (unsigned)(chunk_sent + written),
-                         (unsigned)to_send,
-                         (unsigned)(sent + chunk_sent));
-            }
-
-            chunk_sent += written;
+            free(jpeg_buf);
+            jpeg_del_encoder_engine(encoder);
+            free(temp_frame);
+            return ret;
         }
 
-        sent += chunk_sent;
-
-        // Log progress every 10KB
-        if (sent % 10240 == 0 || sent == jpeg_len) {
-            ESP_LOGI(TAG, "UART TX progress: %u/%u bytes (%.1f%%)",
-                     (unsigned)sent, (unsigned)jpeg_len, 100.0f * sent / jpeg_len);
+        // JPEG encoder writes via DMA; invalidate cache so CPU sees fresh data
+        size_t jpeg_sync_len = (jpeg_len + (CACHE_ALIGN - 1)) & ~(CACHE_ALIGN - 1);
+        if (jpeg_sync_len > allocated_size) {
+            jpeg_sync_len = allocated_size;
+        }
+        esp_err_t jpeg_cache_ret = esp_cache_msync(jpeg_buf, jpeg_sync_len, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+        if (jpeg_cache_ret != ESP_OK) {
+            ESP_LOGW(TAG, "Cache sync (JPEG output) failed: %s", esp_err_to_name(jpeg_cache_ret));
         }
 
-        if (sent < jpeg_len) {
-            vTaskDelay(pdMS_TO_TICKS(5));  // Reduced to 5ms with 460800 baud
+        // Validate JPEG output
+        bool valid_start = (jpeg_len >= 2 && jpeg_buf[0] == 0xFF && jpeg_buf[1] == 0xD8);
+        bool valid_end = (jpeg_len >= 2 && jpeg_buf[jpeg_len-2] == 0xFF && jpeg_buf[jpeg_len-1] == 0xD9);
+
+        ESP_LOGI(TAG, "JPEG encoded: %u bytes (compression: %.1f%%), valid: start=%d end=%d (try %d) first8=%02X %02X %02X %02X %02X %02X %02X %02X",
+                 (unsigned)jpeg_len, 100.0f * jpeg_len / (width * height * 2),
+                 valid_start, valid_end, attempt + 1,
+                 jpeg_buf[0], jpeg_buf[1], jpeg_buf[2], jpeg_buf[3],
+                 jpeg_buf[4], jpeg_buf[5], jpeg_buf[6], jpeg_buf[7]);
+
+        if (valid_start && valid_end) {
+            break;  // success
+        }
+
+        if (attempt == 0) {
+            ESP_LOGW(TAG, "Invalid JPEG markers, retrying encode...");
+            memset(jpeg_buf, 0, allocated_size);
+            esp_cache_msync(jpeg_buf, allocated_size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+            continue;
+        } else {
+            ESP_LOGE(TAG, "⚠️ JPEG encoding produced invalid output! len=%u first8=%02X %02X %02X %02X %02X %02X %02X %02X",
+                     (unsigned)jpeg_len,
+                     jpeg_buf[0], jpeg_buf[1], jpeg_buf[2], jpeg_buf[3],
+                     jpeg_buf[4], jpeg_buf[5], jpeg_buf[6], jpeg_buf[7]);
+            free(jpeg_buf);
+            jpeg_del_encoder_engine(encoder);
+            free(temp_frame);
+            return ESP_FAIL;
         }
     }
 
-    // Wait for transmission to complete
-    uart_wait_tx_done(UART_NUM_2, pdMS_TO_TICKS(5000));
+    // Send photo to Telegram via ESP-AT HTTP client on C6
+    ESP_LOGI(TAG, "Sending photo to Telegram via ESP-AT (%u bytes)...", (unsigned)jpeg_len);
 
-    ESP_LOGI(TAG, "Photo sent successfully (%u bytes)", (unsigned)sent);
+#if CONFIG_AT_TELEGRAM_VIA_C6
+    at_response_t at_ret = at_telegram_send_photo(
+        CONFIG_TELEGRAM_BOT_TOKEN,
+        CONFIG_TELEGRAM_CHAT_ID,
+        jpeg_buf,
+        jpeg_len,
+        caption);
 
     // Cleanup
     free(jpeg_buf);
     jpeg_del_encoder_engine(encoder);
-    free(temp_frame);  // Free temporary un-swapped frame
+    free(temp_frame);
 
-    // Optionally send caption
-    if (caption && strlen(caption) > 0) {
-        char caption_cmd[256];
-        snprintf(caption_cmd, sizeof(caption_cmd), "CAPTION:%s", caption);
-        coproc_uart_send_line(caption_cmd);
+    if (at_ret == AT_OK) {
+        ESP_LOGI(TAG, "Photo sent successfully via ESP-AT");
+        return ESP_OK;
+    } else {
+        ESP_LOGE(TAG, "Photo send failed: %s", at_response_to_str(at_ret));
+        return ESP_FAIL;
     }
-
-    return ESP_OK;
+#else
+    // Fallback: log error if AT client not enabled
+    ESP_LOGE(TAG, "AT_TELEGRAM_VIA_C6 not enabled - cannot send photo");
+    free(jpeg_buf);
+    jpeg_del_encoder_engine(encoder);
+    free(temp_frame);
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
 }

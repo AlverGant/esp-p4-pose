@@ -11,8 +11,19 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "esp_timer.h"
+#include "esp_cache.h"
+#include "esp_heap_caps.h"
 #include <ctype.h>
 #include <stdio.h>
+
+#if CONFIG_AT_TELEGRAM_VIA_C6
+#include "at_http.h"
+#include "at_wifi.h"
+#endif
+
+#if CONFIG_AT_MQTT_ENABLE
+#include "at_mqtt.h"
+#endif
 
 static const char *TAG_NOTIF = "notify";
 
@@ -109,6 +120,22 @@ static esp_err_t fall_notifier_send_locked(const char *source_human,
              label, persons, age_ms, seq);
 
 #if CONFIG_TELEGRAM_ENABLE
+#if CONFIG_AT_TELEGRAM_VIA_C6
+    // Use ESP-AT HTTP client on C6 for Telegram
+    at_response_t at_ret = at_telegram_send_message(
+        CONFIG_TELEGRAM_BOT_TOKEN,
+        CONFIG_TELEGRAM_CHAT_ID,
+        msg);
+    if (at_ret == AT_OK) {
+        delivered = true;
+        last_err = ESP_OK;
+        ESP_LOGI(TAG_NOTIF, "Telegram via C6 AT: %s", label);
+    } else {
+        last_err = ESP_FAIL;
+        ESP_LOGW(TAG_NOTIF, "Telegram via C6 AT falhou: %s", at_response_to_str(at_ret));
+    }
+#else
+    // Use P4 WiFi stack directly
     esp_err_t err = telegram_send_text(msg);
     if (err == ESP_OK) {
         delivered = true;
@@ -118,6 +145,7 @@ static esp_err_t fall_notifier_send_locked(const char *source_human,
         last_err = err;
         ESP_LOGW(TAG_NOTIF, "Falha ao enviar Telegram (%s)", esp_err_to_name(err));
     }
+#endif
 #endif
 
 #if CONFIG_COPROC_UART_ENABLE
@@ -130,14 +158,22 @@ static esp_err_t fall_notifier_send_locked(const char *source_human,
             ESP_LOGI(TAG_NOTIF, "📸 Capturando foto %dx%d para envio via C6", width, height);
 
             // CRITICAL: Make a complete copy WHILE buffer is locked!
+            // Buffer MUST be cache-line aligned (128 bytes for ESP32-P4) for esp_cache_msync!
             size_t frame_size = width * height * sizeof(uint16_t);
-            uint16_t *frame_copy = heap_caps_malloc(frame_size, MALLOC_CAP_SPIRAM);
+            size_t aligned_size = (frame_size + 127) & ~127;  // Round up to 128-byte boundary
+            uint16_t *frame_copy = heap_caps_aligned_alloc(128, aligned_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA);
 
             if (frame_copy) {
-                // Copy frame data while mutex is held
+                // LCD canvas data is already in PSRAM (C2M done in frame_cb after swap)
+                // Just copy the frame data while mutex is held
                 memcpy(frame_copy, frame, frame_size);
 
-                // Now safe to release mutex - we have our own copy
+                // CRITICAL: Sync frame_copy to PSRAM immediately after memcpy!
+                // Without this, if cache lines are evicted before telegram_photo reads,
+                // it would read uninitialized PSRAM data causing corruption.
+                esp_cache_msync(frame_copy, aligned_size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+
+                // Now safe to release mutex - we have our own copy in PSRAM
                 app_main_release_frame();
 
                 // Build caption with event details
@@ -179,11 +215,30 @@ static esp_err_t fall_notifier_send_locked(const char *source_human,
     }
 #endif
 
+#if CONFIG_AT_MQTT_ENABLE
+    // Publish fall event to MQTT
+    {
+        char mqtt_json[256];
+        snprintf(mqtt_json, sizeof(mqtt_json),
+            "{\"event\":\"fall\",\"persons\":%d,\"age_ms\":%d,\"seq\":%d}",
+            persons, age_ms, seq);
+
+        at_response_t mqtt_ret = at_mqtt_publish_string(CONFIG_AT_MQTT_TOPIC_FALL, mqtt_json);
+        if (mqtt_ret == AT_OK) {
+            ESP_LOGI(TAG_NOTIF, "MQTT publicado: %s", CONFIG_AT_MQTT_TOPIC_FALL);
+            delivered = true;
+            last_err = ESP_OK;
+        } else {
+            ESP_LOGW(TAG_NOTIF, "MQTT falhou: %s", at_response_to_str(mqtt_ret));
+        }
+    }
+#endif
+
     if (delivered) {
         s_last_sent_us = now;
     }
 
-#if !CONFIG_TELEGRAM_ENABLE && !CONFIG_COPROC_UART_ENABLE
+#if !CONFIG_TELEGRAM_ENABLE && !CONFIG_COPROC_UART_ENABLE && !CONFIG_AT_MQTT_ENABLE
     (void)delivered;
     (void)last_err;
     ESP_LOGW(TAG_NOTIF, "Nenhum backend de notificação habilitado");
@@ -228,7 +283,8 @@ static void notifier_task(void *arg)
 
         if (fall && !last_fall) {
             ESP_LOGW(TAG_NOTIF, "*** QUEDA DETECTADA! Enviando notificação ***");
-            (void)fall_notifier_send_event("Queda detectada!", persons, age_ms, seq, false);
+            // urgent=true para bypassar cooldown - quedas são sempre enviadas
+            (void)fall_notifier_send_event("Queda detectada!", persons, age_ms, seq, true);
         }
         last_fall = fall;
         vTaskDelay(pdMS_TO_TICKS(250));
@@ -239,5 +295,5 @@ void start_fall_notifier_task(void)
 {
     fall_notifier_lazy_init();
     // SDIO/UART co-processor is initialized early in app_main()
-    xTaskCreatePinnedToCore(notifier_task, "fall_notify", 4096, NULL, 3, NULL, 1);
+    xTaskCreatePinnedToCore(notifier_task, "fall_notify", 8192, NULL, 3, NULL, 1);
 }

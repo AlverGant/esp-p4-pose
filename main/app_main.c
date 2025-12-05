@@ -25,15 +25,24 @@
 #include "fall_notifier.h"
 #include "c6_flash_bridge.h"
 #include "driver/uart.h"
+#include "app_main.h"
+
+#if CONFIG_AT_CLIENT_ENABLE
+#include "at_client.h"
+#include "at_wifi.h"
+#if CONFIG_AT_MQTT_ENABLE
+#include "at_mqtt.h"
+#endif
+#endif
 
 static const char *TAG = "app_main";
 
 #define FALL_DETECTION_LED_GPIO 23  // GPIO do LED no ESP32-P4-EYE (flashlight)
 // Resolution used for pose inference (decoupled from LCD resolution)
-// Using 640x640 for optimal balance: 2x faster inference (~3s vs ~6s for 960x960)
+// Using 480x480 for optimal balance: faster inference than 640x640
 // with same mAP50-95 accuracy (0.449) - ESP-DL benchmarks show no quality loss
-// This gives better responsiveness for fall detection alerts
-#define POSE_INPUT_RES 640
+// 480 is exact divisor of 960 crop (960/2=480), eliminating black borders in photos
+#define POSE_INPUT_RES 480
 
 static esp_lcd_panel_handle_t s_panel = NULL;
 static size_t s_cache_align = 128; // default, will query later
@@ -110,9 +119,6 @@ static void frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index, uint32_t cam
         return;
     }
 
-    // Track latest frame for photo capture
-    s_last_frame_idx = camera_buf_index;
-
     // Scale & center-crop to LCD size
     size_t out_sz = align_up(BSP_LCD_H_RES * BSP_LCD_V_RES * 2, s_cache_align);
 
@@ -121,16 +127,40 @@ static void frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index, uint32_t cam
     // Using 960x960 crop (same as factory_demo scale_level 1) for best quality/performance
     uint32_t crop_size = 960;  // Match factory demo's proven crop size
 
-    (void)app_image_process_scale_crop(
+    esp_err_t canvas_ret = app_image_process_scale_crop(
         camera_buf, cam_w, cam_h,
         crop_size, crop_size,  // Square crop (960x960) from center of 1920x1080
         s_canvas[camera_buf_index], BSP_LCD_H_RES, BSP_LCD_V_RES, out_sz,
         PPA_SRM_ROTATION_ANGLE_0);
 
+    if (canvas_ret != ESP_OK) {
+        ESP_LOGE(TAG, "PPA canvas scale failed: %s (cam=%ux%u, crop=%u)", esp_err_to_name(canvas_ret), cam_w, cam_h, crop_size);
+        xSemaphoreGive(s_canvas_mutex);
+        return;
+    }
+
+    // CRITICAL: Invalidate CPU cache after PPA DMA write, before CPU reads!
+    // Without this, swap_rgb565_bytes reads stale cached data causing image corruption
+    esp_cache_msync(s_canvas[camera_buf_index], out_sz, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
 
     // Swap to match LCD endianness if needed
     uint16_t *be_buf = (uint16_t *)s_canvas[camera_buf_index];
     swap_rgb565_bytes(be_buf, BSP_LCD_H_RES * BSP_LCD_V_RES);
+
+    // CRITICAL: Write back swapped data to PSRAM for photo capture!
+    // Without this, photo capture's DMA reads stale un-swapped data from PSRAM
+    esp_cache_msync(s_canvas[camera_buf_index], out_sz, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+
+    // Track latest VALID frame for photo capture (after swap + cache writeback)
+    int canvas_valid = 0;
+    for (int i = 0; i < 100; i++) {
+        if (be_buf[i] != 0x0000 && be_buf[i] != 0xFFFF) canvas_valid++;
+    }
+    if (canvas_valid < 20) {
+        ESP_LOGW(TAG, "Canvas frame looks blank/invalid (%d/100 valid pixels) - keeping previous frame for photo capture", canvas_valid);
+    } else {
+        s_last_frame_idx = camera_buf_index;
+    }
 
     // Build dedicated pose input at fixed center crop (no ROI/zoom)
     // Using dual-buffer: alternate between buffers to avoid blocking on inference
@@ -141,16 +171,59 @@ static void frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index, uint32_t cam
         s_pose_buf_idx = (s_pose_buf_idx + 1) % 2;
         uint8_t *current_pose_buf = s_pose_buf[s_pose_buf_idx];
 
-        // Camera crop 960x960 → PPA scales to POSE_INPUT_RES (640x640)
+        // Validate camera dimensions before PPA
+        if (cam_w < crop_size || cam_h < crop_size) {
+            ESP_LOGE(TAG, "Camera %ux%u too small for crop %u!", cam_w, cam_h, crop_size);
+            xSemaphoreGive(s_canvas_mutex);
+            return;
+        }
+
+        // Camera crop 960x960 → PPA scales to POSE_INPUT_RES (480x480)
         // This gives 2x faster inference with same accuracy (ESP-DL benchmarks)
         // Fixed 0° rotation (no adaptive rotation)
-        (void)app_image_process_scale_crop(
+        esp_err_t ppa_ret = app_image_process_scale_crop(
             camera_buf, cam_w, cam_h,
             crop_size, crop_size,  // 960x960 crop from camera
             current_pose_buf, POSE_INPUT_RES, POSE_INPUT_RES, pose_out_sz,
             PPA_SRM_ROTATION_ANGLE_0);
+
+        if (ppa_ret != ESP_OK) {
+            ESP_LOGE(TAG, "PPA pose scale failed: %s (cam=%ux%u, crop=%u, out=%d)",
+                     esp_err_to_name(ppa_ret), cam_w, cam_h, crop_size, POSE_INPUT_RES);
+            xSemaphoreGive(s_canvas_mutex);
+            return;
+        }
+
+        // CRITICAL: Invalidate CPU cache after PPA DMA write!
+        // Without this, swap_rgb565_bytes and photo capture read stale cached data
+        esp_cache_msync(current_pose_buf, pose_out_sz, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+
+        // DEBUG: Check if PPA wrote valid data
+        static int debug_count = 0;
+        if (++debug_count <= 10) {
+            // Check camera input buffer
+            uint16_t *cam_p = (uint16_t *)camera_buf;
+            int cam_valid = 0;
+            for (int i = 0; i < 100; i++) {
+                if (cam_p[i] != 0x0000 && cam_p[i] != 0xFFFF) cam_valid++;
+            }
+
+            // Check pose output buffer
+            uint16_t *p = (uint16_t *)current_pose_buf;
+            int nonzero = 0;
+            for (int i = 0; i < 100; i++) {
+                if (p[i] != 0x0000 && p[i] != 0xFFFF) nonzero++;
+            }
+            ESP_LOGI(TAG, "DEBUG[%d] cam=%ux%u valid=%d/100 | pose buf[%d]=%d/100 first=0x%04X",
+                     debug_count, cam_w, cam_h, cam_valid, s_pose_buf_idx, nonzero, p[0]);
+        }
+
         // Pose expects big-endian RGB565 like LCD pipeline
         swap_rgb565_bytes((uint16_t *)current_pose_buf, POSE_INPUT_RES * POSE_INPUT_RES);
+
+        // CRITICAL: Write back CPU cache to PSRAM after swap!
+        // Photo capture reads from PSRAM via DMA, so swapped data must be in PSRAM.
+        esp_cache_msync(current_pose_buf, pose_out_sz, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
 
         // Submit frames to pose task on a time basis
         // Dual-buffer allows us to always submit fresh frames without blocking
@@ -218,32 +291,63 @@ static void frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index, uint32_t cam
 
 const uint16_t* app_main_get_latest_frame(int *width, int *height)
 {
-    // Lock mutex to prevent frame_cb from modifying buffer during photo capture
-    if (s_canvas_mutex && xSemaphoreTake(s_canvas_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-        ESP_LOGW(TAG, "Failed to lock canvas mutex for photo capture");
-        if (width) *width = 0;
-        if (height) *height = 0;
-        return NULL;
+    const int max_attempts = 3;
+    for (int attempt = 0; attempt < max_attempts; attempt++) {
+        // Lock mutex to prevent frame_cb from modifying buffer during photo capture
+        if (s_canvas_mutex && xSemaphoreTake(s_canvas_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+            ESP_LOGW(TAG, "Failed to lock canvas mutex for photo capture");
+            if (width) *width = 0;
+            if (height) *height = 0;
+            return NULL;
+        }
+
+        // Use LCD canvas buffer for photo capture - it's proven to work (LCD displays correctly)
+        // The pose buffer fails after 3 frames due to PPA saturation with 2 ops/frame
+        // Canvas is 240x240, smaller than pose (480x480), but guaranteed valid
+        if (!s_canvas[s_last_frame_idx]) {
+            if (s_canvas_mutex) xSemaphoreGive(s_canvas_mutex);
+            if (width) *width = 0;
+            if (height) *height = 0;
+            return NULL;
+        }
+
+        // Ensure CPU view is fresh before reading
+        size_t frame_sz = BSP_LCD_H_RES * BSP_LCD_V_RES * sizeof(uint16_t);
+        size_t frame_sz_aligned = align_up(frame_sz, s_cache_align);
+        esp_cache_msync((void *)s_canvas[s_last_frame_idx], frame_sz_aligned, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+
+        // Canvas buffer is already byte-swapped for LCD endianness
+        if (width) *width = BSP_LCD_H_RES;
+        if (height) *height = BSP_LCD_V_RES;
+
+        // DEBUG: Check buffer content at capture time
+        uint16_t *p = (uint16_t *)s_canvas[s_last_frame_idx];
+        int nonzero = 0;
+        for (int i = 0; i < 100; i++) {
+            if (p[i] != 0x0000 && p[i] != 0xFFFF) nonzero++;
+        }
+        ESP_LOGI(TAG, "DEBUG get_frame canvas[%d]: %d/100 valid pixels, first=0x%04X",
+                 s_last_frame_idx, nonzero, p[0]);
+
+        if (nonzero < 20) {
+            ESP_LOGW(TAG, "Frame looks invalid for photo (%d/100 valid pixels), retrying... (%d/%d)", nonzero, attempt + 1, max_attempts);
+            app_main_release_frame();
+            vTaskDelay(pdMS_TO_TICKS(40)); // allow next camera frame to arrive
+            continue;
+        }
+
+        ESP_LOGI(TAG, "Locked LCD canvas %d (%dx%d) for photo capture",
+                 s_last_frame_idx, BSP_LCD_H_RES, BSP_LCD_V_RES);
+
+        // NOTE: Caller MUST call app_main_release_frame() after done!
+        return (const uint16_t *)s_canvas[s_last_frame_idx];
     }
 
-    // Return high-res pose buffer (960x960) instead of LCD canvas (240x240)
-    // This gives 16x more pixels for much better photo quality
-    if (!s_pose_buf[s_pose_buf_idx]) {
-        if (s_canvas_mutex) xSemaphoreGive(s_canvas_mutex);
-        if (width) *width = 0;
-        if (height) *height = 0;
-        return NULL;
+    ESP_LOGE(TAG, "Failed to obtain a valid frame after %d attempts", max_attempts);
+    if (s_canvas_mutex) {
+        xSemaphoreGive(s_canvas_mutex);
     }
-
-    // Pose buffer is already big-endian RGB565 after swap, ready for JPEG
-    if (width) *width = POSE_INPUT_RES;
-    if (height) *height = POSE_INPUT_RES;
-
-    ESP_LOGI(TAG, "Locked pose buffer %d (%dx%d) for photo capture",
-             s_pose_buf_idx, POSE_INPUT_RES, POSE_INPUT_RES);
-
-    // NOTE: Caller MUST call app_main_release_frame() after done!
-    return (const uint16_t *)s_pose_buf[s_pose_buf_idx];
+    return NULL;
 }
 
 void app_main_release_frame(void)
@@ -312,6 +416,59 @@ void app_main(void)
             esp_err_t send_ret = coproc_uart_send_line("P4_PING");
             ESP_LOGI(TAG, "Test send result: %s (expecting C6_ACK)", esp_err_to_name(send_ret));
             vTaskDelay(pdMS_TO_TICKS(1000));  // Wait for C6_ACK response
+
+#if CONFIG_AT_CLIENT_ENABLE
+            // Initialize AT client for ESP-AT firmware on C6
+            ESP_LOGI(TAG, "Initializing AT client...");
+            at_client_config_t at_config = AT_CLIENT_CONFIG_DEFAULT();
+            at_config.default_timeout_ms = CONFIG_AT_CLIENT_TIMEOUT_MS;
+            at_config.connect_timeout_ms = CONFIG_AT_CLIENT_CONNECT_TIMEOUT_MS;
+            if (at_client_init(&at_config) == ESP_OK) {
+                // Test AT communication
+                if (at_test()) {
+                    ESP_LOGI(TAG, "✅ AT client communication OK");
+
+                    // Disable echo for cleaner responses
+                    at_set_echo(false);
+
+#if CONFIG_AT_WIFI_AUTO_CONNECT
+                    // Connect WiFi via AT commands
+                    ESP_LOGI(TAG, "Connecting WiFi via AT...");
+                    at_response_t wifi_ret = at_wifi_init_and_connect(
+                        CONFIG_WIFI_SSID,
+                        CONFIG_WIFI_PASSWORD);
+                    if (wifi_ret == AT_OK) {
+                        ESP_LOGI(TAG, "✅ WiFi connected via AT");
+
+#if CONFIG_AT_MQTT_ENABLE
+                        // Connect to MQTT broker
+                        ESP_LOGI(TAG, "Connecting MQTT via AT...");
+                        at_response_t mqtt_ret = at_mqtt_connect_simple(
+                            CONFIG_AT_MQTT_BROKER_HOST,
+                            CONFIG_AT_MQTT_BROKER_PORT,
+                            CONFIG_AT_MQTT_CLIENT_ID,
+                            strlen(CONFIG_AT_MQTT_USERNAME) > 0 ? CONFIG_AT_MQTT_USERNAME : NULL,
+                            strlen(CONFIG_AT_MQTT_PASSWORD) > 0 ? CONFIG_AT_MQTT_PASSWORD : NULL);
+                        if (mqtt_ret == AT_OK) {
+                            ESP_LOGI(TAG, "✅ MQTT connected via AT");
+                            // Publish online status
+                            at_mqtt_publish_string(CONFIG_AT_MQTT_TOPIC_STATUS,
+                                "{\"status\":\"online\",\"device\":\"esp32p4\"}");
+                        } else {
+                            ESP_LOGW(TAG, "MQTT connect failed: %s", at_response_to_str(mqtt_ret));
+                        }
+#endif
+                    } else {
+                        ESP_LOGW(TAG, "WiFi connect via AT failed: %s", at_response_to_str(wifi_ret));
+                    }
+#endif
+                } else {
+                    ESP_LOGW(TAG, "AT test failed - ESP-AT firmware may not be running");
+                }
+            } else {
+                ESP_LOGE(TAG, "AT client init failed");
+            }
+#endif
         } else {
             ESP_LOGW(TAG, "⚠️  C6_READY timeout! C6 may not be responding properly");
             ESP_LOGW(TAG, "    Check C6 logs for WiFi/SNTP issues. Continuing anyway...");
@@ -341,7 +498,7 @@ void app_main(void)
             .intr_type = GPIO_INTR_DISABLE,
         };
         gpio_config(&io);
-        xTaskCreatePinnedToCore(fall_test_btn_task, "fall_btn", 4096, NULL, 1, NULL, 0);
+        xTaskCreatePinnedToCore(fall_test_btn_task, "fall_btn", 8192, NULL, 1, NULL, 0);  // Larger stack for HTTP
     }
     return;
 #endif
@@ -447,7 +604,7 @@ void app_main(void)
             .intr_type = GPIO_INTR_DISABLE,
         };
         gpio_config(&io);
-        xTaskCreatePinnedToCore(fall_test_btn_task, "fall_btn", 4096, NULL, 1, NULL, 0);
+        xTaskCreatePinnedToCore(fall_test_btn_task, "fall_btn", 8192, NULL, 1, NULL, 0);  // Larger stack for HTTP
     }
 
     // Start fall notifier (Telegram)
