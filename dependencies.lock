@@ -79,7 +79,7 @@ dependencies:
     - esp32
     - esp32s3
     - esp32p4
-    version: 3.2.0
+    version: 3.2.1
   espressif/esp-dsp:
     component_hash: 42dce32d46ac93dc11f60d368e29a830e9661c7345d794b8a45c343479cae636
     dependencies:

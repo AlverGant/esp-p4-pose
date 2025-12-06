@@ -73,6 +73,78 @@ menu "Network & Telegram"
 
 endmenu
 
+menu "ESP-AT Client (C6 Communication)"
+
+    config AT_CLIENT_ENABLE
+        bool "Enable ESP-AT client for C6 co-processor"
+        default y
+        depends on COPROC_UART_ENABLE
+        help
+            Enable AT command communication with ESP32-C6 running ESP-AT firmware.
+
+    config AT_CLIENT_TIMEOUT_MS
+        int "Default AT command timeout (ms)"
+        default 5000
+        range 1000 60000
+        depends on AT_CLIENT_ENABLE
+
+    config AT_CLIENT_CONNECT_TIMEOUT_MS
+        int "WiFi/MQTT connect timeout (ms)"
+        default 30000
+        range 5000 120000
+        depends on AT_CLIENT_ENABLE
+
+    config AT_WIFI_AUTO_CONNECT
+        bool "Auto-connect WiFi on startup"
+        default y
+        depends on AT_CLIENT_ENABLE
+
+    config AT_MQTT_ENABLE
+        bool "Enable MQTT via ESP-AT"
+        default n
+        depends on AT_CLIENT_ENABLE
+
+    if AT_MQTT_ENABLE
+        config AT_MQTT_BROKER_HOST
+            string "MQTT Broker hostname"
+            default "mqtt.example.com"
+
+        config AT_MQTT_BROKER_PORT
+            int "MQTT Broker port"
+            default 1883
+            range 1 65535
+
+        config AT_MQTT_CLIENT_ID
+            string "MQTT Client ID"
+            default "esp32p4"
+
+        config AT_MQTT_USERNAME
+            string "MQTT Username (optional)"
+            default ""
+
+        config AT_MQTT_PASSWORD
+            string "MQTT Password (optional)"
+            default ""
+
+        config AT_MQTT_TOPIC_FALL
+            string "MQTT topic for fall events"
+            default "home/fall"
+
+        config AT_MQTT_TOPIC_STATUS
+            string "MQTT topic for status"
+            default "home/esp32p4/status"
+    endif
+
+    config AT_TELEGRAM_VIA_C6
+        bool "Send Telegram via C6 (AT+HTTPCLIENT)"
+        default y
+        depends on AT_CLIENT_ENABLE && TELEGRAM_ENABLE
+        help
+            Use ESP-AT HTTP client on C6 to send Telegram messages
+            instead of P4's WiFi stack.
+
+endmenu
+
 menu "Co-processor Messenger (UART)"
 
     config COPROC_UART_ENABLE

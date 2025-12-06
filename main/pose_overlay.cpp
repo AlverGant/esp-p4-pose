@@ -156,7 +156,10 @@ esp_err_t pose_overlay_init(void)
             ESP_LOGE(TAG_POSE, "Failed to create COCOPose");
             return ESP_ERR_NO_MEM;
         }
-        ESP_LOGI(TAG_POSE, "Pose initialized (YOLO11n-Pose V2 with QAT, loaded immediately)");
+        // Increase confidence threshold from default 0.25 to 0.45 to reduce false positives
+        // (detections where no person exists). Higher = fewer false positives but may miss some poses.
+        s_pose->set_score_thr(0.45);
+        ESP_LOGI(TAG_POSE, "Pose initialized (YOLO11n-Pose V2 with QAT, score_thr=0.45)");
     }
     if (!s_sem) {
         s_sem = xSemaphoreCreateBinary();

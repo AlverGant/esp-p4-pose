@@ -6,6 +6,10 @@
 #include "freertos/semphr.h"
 #include <string.h>
 
+#if CONFIG_AT_CLIENT_ENABLE
+#include "at_client.h"
+#endif
+
 static const char *TAG_UART = "coproc_uart";
 static TaskHandle_t s_rx_task = NULL;
 static bool s_uart_inited = false;
@@ -53,19 +57,33 @@ static void coproc_uart_rx_task(void *arg)
 
         if (r == 1) {
             total_bytes++;
+            // DEBUG: Log all received bytes
+            if (ch >= 32 && ch < 127) {
+                ESP_LOGD(TAG_UART, "RX byte: '%c' (0x%02X)", ch, ch);
+            } else {
+                ESP_LOGD(TAG_UART, "RX byte: 0x%02X", ch);
+            }
+
+#if CONFIG_AT_CLIENT_ENABLE
+            // Feed every byte to AT client for prompt detection (e.g., '>')
+            if (at_client_is_initialized()) {
+                at_client_process_byte(ch);
+            }
+#endif
+
             if (ch == '\n' || ch == '\r') {
                 if (n > 0) {
                     line[n] = 0;
                     // Log all received lines
                     ESP_LOGI(TAG_UART, "C6[%s]: %s", cand ? cand->name : "cfg", line);
 
-                    // Detect C6_READY signal
-                    if (!s_c6_ready_flag && strstr(line, "C6_READY")) {
+                    // Detect C6_READY signal or ESP-AT "ready"
+                    if (!s_c6_ready_flag && (strstr(line, "C6_READY") || strstr(line, "ready") || strstr(line, "at-init:"))) {
                         s_c6_ready_flag = true;
                         if (s_c6_ready_sem) {
                             xSemaphoreGive(s_c6_ready_sem);
                         }
-                        ESP_LOGI(TAG_UART, "🟢 C6_READY detected! C6 is ready for commands");
+                        ESP_LOGI(TAG_UART, "🟢 C6 ready detected! ESP-AT initialized");
                     }
 
                     // Process C6 acknowledgments
@@ -172,26 +190,18 @@ esp_err_t coproc_uart_send_line(const char *line)
         return ESP_ERR_INVALID_STATE;
     }
 
-    // CRITICAL FIX: Flush RX buffer before sending to prevent interference
-    size_t rx_bytes = 0;
-    uart_get_buffered_data_len(port, &rx_bytes);
-    if (rx_bytes > 0) {
-        // Log at INFO level to debug communication issues
-        ESP_LOGI(TAG_UART, "Note: Flushing %d bytes from RX buffer before send", (int)rx_bytes);
-        uart_flush_input(port);
-    }
-
-    // CRITICAL FIX: Clear TX FIFO before writing to ensure clean transmission
+    // Wait for any pending TX to complete before sending new command
     uart_wait_tx_done(port, pdMS_TO_TICKS(100));
 
-    // Compose message with newline
+    // Compose message with CRLF (ESP-AT expects \r\n termination)
     char buf[256];
-    size_t n = strnlen(line, sizeof(buf) - 2);
+    size_t n = strnlen(line, sizeof(buf) - 3);
     memcpy(buf, line, n);
+    buf[n++] = '\r';
     buf[n++] = '\n';
 
     // blocking write
-    ESP_LOGI(TAG_UART, "TX→C6 [UART%d]: %.*s", port, (int)(n-1), buf);
+    ESP_LOGI(TAG_UART, "TX→C6 [UART%d]: %.*s", port, (int)(n-2), buf);  // -2 to exclude \r\n
     int w = uart_write_bytes(port, buf, n);
 
     if (w == (int)n) {

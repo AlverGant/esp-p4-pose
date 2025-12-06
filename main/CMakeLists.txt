@@ -10,6 +10,11 @@ idf_component_register(
     "coproc_sdio.c"
     "c6_flash_bridge.c"
     "telegram_photo.c"
+    "at_client.c"
+    "at_wifi.c"
+    "at_mqtt.c"
+    "at_http.c"
+    "at_ota.c"
   INCLUDE_DIRS "."
   REQUIRES
     coco_pose
