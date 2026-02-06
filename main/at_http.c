@@ -15,6 +15,40 @@
 #include <stdlib.h>
 
 static const char *TAG = "at_http";
+static const char *TAG_SEC = "at_http_sec";
+
+static void log_http_request(at_http_method_t method, const char *url)
+{
+    if (!url) {
+        return;
+    }
+
+    const char *bot = strstr(url, "/bot");
+    if (!bot) {
+        ESP_LOGI(TAG, "HTTP %s %s", method == AT_HTTP_METHOD_GET ? "GET" : "POST", url);
+        return;
+    }
+
+    const char *token_start = bot + 4;
+    const char *token_end = strchr(token_start, '/');
+    if (!token_end) {
+        ESP_LOGI(TAG_SEC, "HTTP %s %.*s/bot[REDACTED]",
+                 method == AT_HTTP_METHOD_GET ? "GET" : "POST",
+                 (int)(bot - url), url);
+        return;
+    }
+
+    char redacted[256];
+    int written = snprintf(redacted, sizeof(redacted), "%.*s/bot[REDACTED]%s",
+                           (int)(bot - url), url, token_end);
+    if (written < 0 || written >= (int)sizeof(redacted)) {
+        ESP_LOGI(TAG_SEC, "HTTP %s request to Telegram (token redacted)",
+                 method == AT_HTTP_METHOD_GET ? "GET" : "POST");
+        return;
+    }
+
+    ESP_LOGI(TAG_SEC, "HTTP %s %s", method == AT_HTTP_METHOD_GET ? "GET" : "POST", redacted);
+}
 
 at_response_t at_http_request(at_http_method_t method, const char *url,
                                const char *headers, const uint8_t *body, size_t body_len,
@@ -42,7 +76,7 @@ at_response_t at_http_request(at_http_method_t method, const char *url,
         content_type = AT_HTTP_CONTENT_FORM_DATA;
     }
 
-    ESP_LOGI(TAG, "HTTP %s %s", method == AT_HTTP_METHOD_GET ? "GET" : "POST", url);
+    log_http_request(method, url);
 
     // AT+HTTPCLIENT=<opt>,<content-type>,<"url">,<"host">,<"path">,<transport>[,<"data">][,<"headers">]
     // opt: 1=HEAD, 2=GET, 3=POST, 4=PUT, 5=DELETE
@@ -150,7 +184,7 @@ at_response_t at_http_get(const char *url, char *response, size_t response_len)
         transport = AT_HTTP_TRANSPORT_TLS;
     }
 
-    ESP_LOGI(TAG, "HTTP GET %s", url);
+    log_http_request(AT_HTTP_METHOD_GET, url);
 
     return at_send_cmd_fmt(response, response_len, 30000,
         "+HTTPCLIENT=2,0,\"%s\",\"\",\"\",%d", url, transport);
@@ -163,7 +197,7 @@ at_response_t at_http_post_json(const char *url, const char *json_body,
         return AT_ERROR;
     }
 
-    ESP_LOGI(TAG, "HTTP POST JSON %s", url);
+    log_http_request(AT_HTTP_METHOD_POST, url);
 
     size_t json_len = strlen(json_body);
 
@@ -214,7 +248,7 @@ at_response_t at_http_post_form(const char *url, const char *form_data,
         transport = AT_HTTP_TRANSPORT_TLS;
     }
 
-    ESP_LOGI(TAG, "HTTP POST form %s", url);
+    log_http_request(AT_HTTP_METHOD_POST, url);
 
     return at_send_cmd_fmt(response, response_len, 30000,
         "+HTTPCLIENT=3,0,\"%s\",\"\",\"\",%d,\"%s\"", url, transport, form_data);
