@@ -1,90 +1,90 @@
 # ESP32-P4 Pose Detection System
 
-Sistema de detecção de pose humana em tempo real usando ESP32-P4-EYE com integração Telegram para notificações de quedas.
+Real-time human pose detection system using ESP32-P4-EYE with Telegram integration for fall notifications.
 
-## Visão Geral
+## Overview
 
-Este projeto implementa um sistema de visão computacional embarcado que:
-- Detecta poses humanas em tempo real usando YOLO11n-Pose
-- Identifica potenciais quedas através de análise de keypoints
-- Envia alertas e fotos automaticamente via Telegram
-- Utiliza arquitetura dual-chip (ESP32-P4 + ESP32-C6) para processamento distribuído
+This project implements an embedded computer vision system that:
+- Detects human poses in real time using YOLO11n-Pose
+- Identifies potential falls through keypoint analysis
+- Sends alerts and photos automatically via Telegram
+- Uses a dual-chip architecture (ESP32-P4 + ESP32-C6) for distributed processing
 
 ## Hardware
 
-- **Chip Principal**: ESP32-P4-EYE (processamento de vídeo e inferência)
-- **Co-processador**: ESP32-C6 (comunicação WiFi e Telegram)
-- **Câmera**: OV2710 (configuração customizada)
-- **Display**: LCD integrado para visualização em tempo real
-- **Comunicação**: UART entre P4 e C6
+- **Main Chip**: ESP32-P4-EYE (video processing and inference)
+- **Co-processor**: ESP32-C6 (WiFi and Telegram communication)
+- **Camera**: OV2710 (custom configuration)
+- **Display**: Built-in LCD for real-time visualization
+- **Communication**: UART between P4 and C6
 
-## Funcionalidades
+## Features
 
-### Detecção de Pose
-- Modelo: YOLO11n-Pose V2 (QAT - Quantization-Aware Training)
-- Resolução de inferência: 640x640 pixels (~3s no ESP32-P4)
-- Precisão: mAP50-95 = 0.449 (+4.2% vs V1)
-- Detecção de 17 keypoints do esqueleto COCO
-- Overlay visual com pose detectada no LCD
+### Pose Detection
+- Model: YOLO11n-Pose V2 (QAT - Quantization-Aware Training)
+- Inference resolution: 640x640 pixels (~3s on ESP32-P4)
+- Accuracy: mAP50-95 = 0.449 (+4.2% vs V1)
+- Detection of 17 COCO skeleton keypoints
+- Visual overlay with detected pose on LCD
 
-### Detecção de Quedas
-- Análise automática de orientação corporal
-- LED de alerta (GPIO 23)
-- Sistema de cooldown configurável para evitar spam
+### Fall Detection
+- Automatic body orientation analysis
+- Alert LED (GPIO 23)
+- Configurable cooldown system to prevent spam
 
-### Integração Telegram
-- Envio de mensagens de alerta
-- Envio de fotos JPEG com pose detectada
-- Configuração via `menuconfig`
-- Servidor HTTP local para receber comandos remotos
+### Telegram Integration
+- Alert message delivery
+- JPEG photo delivery with detected pose
+- Configuration via `menuconfig`
+- Local HTTP server for receiving remote commands
 
 ### Dual-Buffer Architecture
-- Captura contínua enquanto inferência executa
-- Proteção de buffer durante envio de fotos
-- Sincronização via mutex para thread-safety
+- Continuous capture while inference runs
+- Buffer protection during photo transmission
+- Synchronization via mutex for thread-safety
 
-## Estrutura do Projeto
+## Project Structure
 
 ```
 .
-├── main/                    # Aplicação principal (ESP32-P4)
-│   ├── app_main.c          # Entry point e loop principal
-│   ├── app_video.c         # Controle de câmera e display
-│   ├── coco_pose.cpp       # Wrapper do modelo YOLO11
-│   ├── pose_overlay.cpp    # Desenho de keypoints no LCD
-│   ├── fall_notifier.c     # Lógica de detecção de quedas
-│   ├── net_telegram.c      # API Telegram
-│   ├── telegram_photo.c    # Codificação JPEG para Telegram
-│   ├── coproc_uart.c       # Comunicação UART com C6
-│   └── c6_flash_bridge.c   # Flash remoto do C6 via P4
+├── main/                    # Main application (ESP32-P4)
+│   ├── app_main.c          # Entry point and main loop
+│   ├── app_video.c         # Camera and display control
+│   ├── coco_pose.cpp       # YOLO11 model wrapper
+│   ├── pose_overlay.cpp    # Keypoint drawing on LCD
+│   ├── fall_notifier.c     # Fall detection logic
+│   ├── net_telegram.c      # Telegram API
+│   ├── telegram_photo.c    # JPEG encoding for Telegram
+│   ├── coproc_uart.c       # UART communication with C6
+│   └── c6_flash_bridge.c   # Remote C6 flashing via P4
 │
-├── c6_messenger/           # Firmware do co-processador (ESP32-C6)
+├── c6_messenger/           # Co-processor firmware (ESP32-C6)
 │   └── main/
 │       ├── main.c          # WiFi, HTTP client, UART
-│       └── hosted_alert_server.c  # Servidor HTTP para comandos
+│       └── hosted_alert_server.c  # HTTP server for commands
 │
-├── components/             # Componentes customizados
-├── p4_sdio_flash/         # Utilitário de flash SDIO
-├── resources/             # Binários necessários para flash do C6
-└── docs/                  # Documentação técnica
+├── components/             # Custom components
+├── p4_sdio_flash/         # SDIO flash utility
+├── resources/             # Required binaries for C6 flashing
+└── docs/                  # Technical documentation
 
 ```
 
-## Melhorias Recentes
+## Recent Improvements
 
-### v1.1 - Otimizações de Performance (2025-01)
-- ✅ **Upgrade para YOLO11n-Pose V2**: +4.2% precisão (mAP 0.449 vs 0.431)
-- ⚡ **Resolução otimizada**: 640x640 (2x mais rápido que 960x960)
-- 🎯 **Thresholds ajustados**: Otimizados para modelo V2 com QAT
-- 📊 **Latência de inferência**: Reduzida de ~6s para ~3s
+### v1.1 - Performance Optimizations (2025-01)
+- ✅ **Upgrade to YOLO11n-Pose V2**: +4.2% accuracy (mAP 0.449 vs 0.431)
+- ⚡ **Optimized resolution**: 640x640 (2x faster than 960x960)
+- 🎯 **Adjusted thresholds**: Optimized for V2 model with QAT
+- 📊 **Inference latency**: Reduced from ~6s to ~3s
 
-## Como Compilar
+## How to Build
 
-### Pré-requisitos
-- ESP-IDF v5.x ou superior
-- Toolchain para ESP32-P4 e ESP32-C6
+### Prerequisites
+- ESP-IDF v5.x or higher
+- Toolchain for ESP32-P4 and ESP32-C6
 
-### Build do Projeto Principal (P4)
+### Main Project Build (P4)
 ```bash
 idf.py set-target esp32p4
 idf.py menuconfig  # Configure WiFi, Telegram, etc.
@@ -92,12 +92,12 @@ idf.py build
 idf.py flash monitor
 ```
 
-Ou use o script de conveniência:
+Or use the convenience script:
 ```bash
 ./rebuild_and_flash_p4.sh
 ```
 
-### Build do C6 Messenger
+### C6 Messenger Build
 ```bash
 cd c6_messenger
 idf.py set-target esp32c6
@@ -105,94 +105,94 @@ idf.py menuconfig
 idf.py build
 ```
 
-Ou use o script:
+Or use the script:
 ```bash
 ./rebuild_and_flash_c6.sh
 ```
 
-## Configuração
+## Configuration
 
 ### Telegram Bot
-1. Crie um bot via [@BotFather](https://t.me/botfather)
-2. Obtenha o token do bot
-3. Obtenha seu chat_id via [@userinfobot](https://t.me/userinfobot)
+1. Create a bot via [@BotFather](https://t.me/botfather)
+2. Get the bot token
+3. Get your chat_id via [@userinfobot](https://t.me/userinfobot)
 4. Configure via `idf.py menuconfig`:
    - `Component config → Telegram → Enable Telegram`
-   - Insira `Bot Token` e `Chat ID`
-   - Ajuste cooldown de mensagens (padrão: 60s)
+   - Enter `Bot Token` and `Chat ID`
+   - Adjust message cooldown (default: 60s)
 
 ### WiFi
-Configure as credenciais via `menuconfig`:
+Configure credentials via `menuconfig`:
 - `Component config → Wi-Fi Configuration`
 
-## Comunicação entre P4 e C6
+## P4 and C6 Communication
 
-O sistema usa protocolo UART customizado:
-- **P4 → C6**: Comandos JSON (envio de mensagens/fotos)
-- **C6 → P4**: Respostas e notificações
-- Baudrate: Configurável (padrão: 115200)
+The system uses a custom UART protocol:
+- **P4 → C6**: JSON commands (message/photo delivery)
+- **C6 → P4**: Responses and notifications
+- Baud rate: Configurable (default: 115200)
 
-### Exemplo de Mensagem
+### Message Example
 ```json
-{"cmd":"telegram","msg":"Queda detectada!","photo":"<base64_jpeg>"}
+{"cmd":"telegram","msg":"Fall detected!","photo":"<base64_jpeg>"}
 ```
 
-## Arquitetura de Software
+## Software Architecture
 
-### Pipeline de Vídeo (P4)
-1. Captura de frame da câmera (OV2710)
-2. Redimensionamento via PPA para 960x960
-3. Inferência YOLO11 em buffer alternado
-4. Extração de keypoints e análise de pose
-5. Desenho de overlay no LCD
-6. Detecção de queda → Trigger de notificação
+### Video Pipeline (P4)
+1. Frame capture from camera (OV2710)
+2. Resize via PPA to 960x960
+3. YOLO11 inference on alternating buffer
+4. Keypoint extraction and pose analysis
+5. Overlay drawing on LCD
+6. Fall detection → Notification trigger
 
 ### Messenger Task (C6)
-1. Conecta WiFi
-2. Sincroniza tempo via SNTP
-3. Escuta comandos UART do P4
-4. Envia requisições HTTP para API Telegram
-5. Serve HTTP local para comandos remotos
+1. Connects to WiFi
+2. Syncs time via SNTP
+3. Listens for UART commands from P4
+4. Sends HTTP requests to Telegram API
+5. Serves local HTTP for remote commands
 
 ## Flash Bridge
-O P4 pode flashar o C6 remotamente via UART usando `c6_flash_bridge`:
+The P4 can flash the C6 remotely via UART using `c6_flash_bridge`:
 ```bash
-# No P4, ative o modo bridge e use esptool via UART
+# On P4, enable bridge mode and use esptool via UART
 ```
 
 ## Troubleshooting
 
-### Fotos Corrompidas no Telegram
-- Verifique cache sync em `telegram_photo.c:125`
-- Aumente `CONFIG_SPIRAM_FETCH_INSTRUCTIONS`
+### Corrupted Photos on Telegram
+- Check cache sync in `telegram_photo.c:125`
+- Increase `CONFIG_SPIRAM_FETCH_INSTRUCTIONS`
 
 ### UART Communication Issues
-- Verifique GPIO pins (TX/RX)
-- Confirme baudrate igual em P4 e C6
-- Veja logs: `main/coproc_uart.c`
+- Check GPIO pins (TX/RX)
+- Confirm matching baud rate on P4 and C6
+- See logs: `main/coproc_uart.c`
 
-### Performance de Inferência
-- Resolução atual: 640x640 (~3s no ESP32-P4)
-- Modelo V2 com QAT: mAP50-95 = 0.449
-- Para maior qualidade: use 960x960 (~6s, mesma precisão)
-- Para tempo real: teste 320x320 (~600ms, -25% precisão)
+### Inference Performance
+- Current resolution: 640x640 (~3s on ESP32-P4)
+- V2 model with QAT: mAP50-95 = 0.449
+- For higher quality: use 960x960 (~6s, same accuracy)
+- For real-time: try 320x320 (~600ms, -25% accuracy)
 
-## Documentos Técnicos
+## Technical Documents
 
 - [SDIO Troubleshooting](docs/sdio_troubleshooting.md)
 - [SDIO Packet Mode Analysis](docs/sdio_packet_mode_analysis.md)
 - [P4 Eye SDIO Nets](docs/p4_eye_sdio_nets.txt)
 
-## Contribuindo
+## Contributing
 
-Pull requests são bem-vindos! Para mudanças maiores, abra uma issue primeiro para discutir o que você gostaria de mudar.
+Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
 
-## Licença
+## License
 
-[Especifique a licença aqui]
+[Specify license here]
 
-## Créditos
+## Credits
 
-- Modelo YOLO11n-Pose: Ultralytics
+- YOLO11n-Pose model: Ultralytics
 - ESP-DL: Espressif Deep Learning Library
 - ESP32-P4-EYE: Espressif Systems
